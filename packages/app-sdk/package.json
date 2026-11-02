@@ -1,0 +1,15 @@
+{
+  "name": "@novyse/app-sdk",
+  "version": "0.1.0",
+  "private": true,
+  "type": "module",
+  "description": "Types and development host for Novyse activity plugins.",
+  "exports": {
+    ".": "./src/index.ts",
+    "./dev": "./src/dev-host.ts"
+  },
+  "types": "./src/index.ts",
+  "files": [
+    "src"
+  ]
+}
