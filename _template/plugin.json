@@ -1,0 +1,8 @@
+{
+  "id": "hello-activity",
+  "name": "Hello Activity",
+  "description": "Minimal activity: a shared counter over STATE and a ping over ACTION.",
+  "version": "0.1.0",
+  "capabilities": [],
+  "author": "Novyse"
+}

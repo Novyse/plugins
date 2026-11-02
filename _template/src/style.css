@@ -1,0 +1,23 @@
+@import "tailwindcss";
+
+/* The tile of the voice room is small and has no scrolling chrome: the plugin
+   owns the whole surface the host gives it. */
+html,
+body,
+#app {
+  height: 100%;
+  margin: 0;
+}
+
+body {
+  font-family:
+    Inter,
+    system-ui,
+    -apple-system,
+    "Segoe UI",
+    sans-serif;
+  background: #0a0a0a;
+  overscroll-behavior: none;
+  user-select: none;
+  -webkit-user-select: none;
+}
