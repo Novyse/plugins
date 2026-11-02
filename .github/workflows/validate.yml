@@ -1,0 +1,41 @@
+name: validate
+
+on:
+  push:
+    branches: [main]
+  pull_request:
+
+jobs:
+  registry:
+    name: registry
+    runs-on: ubuntu-latest
+
+    steps:
+      - uses: actions/checkout@v4
+
+      - uses: actions/setup-node@v4
+        with:
+          node-version: 22
+
+      - name: Validate registry.json
+        run: node scripts/validate-registry.mjs
+
+      - name: Check every tag matches its entry
+        run: |
+          set -euo pipefail
+
+          node - <<'NODE'
+          const { execSync } = require('node:child_process');
+          const registry = require('./registry.json');
+
+          for (const plugin of registry.plugins) {
+            const expected = `${plugin.slug}@${plugin.version}`;
+
+            if (plugin.tag !== expected) {
+              console.error(`tag mismatch for ${plugin.slug}: ${plugin.tag} != ${expected}`);
+              process.exit(1);
+            }
+          }
+
+          console.log('tags ok');
+          NODE

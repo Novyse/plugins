@@ -1,0 +1,57 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "$id": "https://raw.githubusercontent.com/novyse/plugins/main/schema/manifest.schema.json",
+  "title": "Novyse plugin manifest",
+  "description": "Manifest shipped inside dist/manifest.json of every plugin bundle.",
+  "type": "object",
+  "additionalProperties": false,
+  "required": [
+    "schemaVersion",
+    "id",
+    "name",
+    "version",
+    "entry",
+    "capabilities"
+  ],
+  "properties": {
+    "schemaVersion": {
+      "const": 1
+    },
+    "id": {
+      "type": "string",
+      "pattern": "^[a-z0-9][a-z0-9-]{1,63}$"
+    },
+    "name": {
+      "type": "string",
+      "minLength": 1,
+      "maxLength": 64
+    },
+    "description": {
+      "type": "string",
+      "maxLength": 280
+    },
+    "version": {
+      "type": "string",
+      "pattern": "^(0|[1-9][0-9]*)\\.(0|[1-9][0-9]*)\\.(0|[1-9][0-9]*)$"
+    },
+    "entry": {
+      "const": "index.html"
+    },
+    "stateVersion": {
+      "type": "integer",
+      "minimum": 1,
+      "description": "Version of the STATE payload format. A breaking change requires a new major version."
+    },
+    "capabilities": {
+      "type": "array",
+      "uniqueItems": true,
+      "items": {
+        "enum": ["stream", "fullscreen", "network"]
+      }
+    },
+    "author": {
+      "type": "string",
+      "maxLength": 120
+    }
+  }
+}

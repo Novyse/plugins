@@ -1,0 +1,68 @@
+name: release
+
+on:
+  push:
+    tags:
+      - "*@*"
+
+permissions:
+  contents: write
+
+jobs:
+  publish:
+    name: publish
+    runs-on: ubuntu-latest
+
+    steps:
+      - uses: actions/checkout@v4
+
+      - uses: actions/setup-node@v4
+        with:
+          node-version: 22
+
+      - name: Validate the registry
+        run: node scripts/validate-registry.mjs
+
+      - name: Package the bundle
+        run: |
+          set -euo pipefail
+
+          tag="${GITHUB_REF_NAME}"
+          slug="${tag%@*}"
+          version="${tag#*@}"
+          dist="plugins/${slug}/dist"
+
+          if [ ! -f "${dist}/index.html" ]; then
+            echo "missing ${dist}/index.html: build the plugin and commit dist/ before tagging" >&2
+            exit 1
+          fi
+
+          if [ ! -f "${dist}/manifest.json" ]; then
+            echo "missing ${dist}/manifest.json" >&2
+            exit 1
+          fi
+
+          expected="$(node -p "require('./plugins/${slug}/plugin.json').version")"
+          if [ "${expected}" != "${version}" ]; then
+            echo "tag ${tag} does not match plugins/${slug}/plugin.json version ${expected}" >&2
+            exit 1
+          fi
+
+          archive="${slug}-bundle.zip"
+          rm -f "${archive}"
+          (cd "${dist}" && zip -q -r "${GITHUB_WORKSPACE}/${archive}" .)
+          sha256sum "${archive}"
+
+      - name: Publish the release
+        env:
+          GH_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+        run: |
+          set -euo pipefail
+
+          tag="${GITHUB_REF_NAME}"
+          slug="${tag%@*}"
+          version="${tag#*@}"
+
+          gh release create "${tag}" "${ARCHIVE}" \
+            --title "${slug} ${version}" \
+            --notes "Source: https://github.com/${GITHUB_REPOSITORY}/tree/${tag}"

@@ -1,0 +1,108 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "$id": "https://raw.githubusercontent.com/novyse/plugins/main/schema/registry.schema.json",
+  "title": "Novyse plugin registry",
+  "description": "Index of the plugins published by the official library. It is the only source of truth: the API gateway reads it and never queries the GitHub API.",
+  "type": "object",
+  "additionalProperties": false,
+  "required": ["schemaVersion", "library", "plugins"],
+  "properties": {
+    "schemaVersion": {
+      "const": 1
+    },
+    "library": {
+      "type": "string",
+      "minLength": 1,
+      "maxLength": 120
+    },
+    "updatedAt": {
+      "type": "string",
+      "format": "date-time"
+    },
+    "plugins": {
+      "type": "array",
+      "items": {
+        "$ref": "#/$defs/plugin"
+      }
+    }
+  },
+  "$defs": {
+    "slug": {
+      "type": "string",
+      "pattern": "^[a-z0-9][a-z0-9-]{1,63}$"
+    },
+    "version": {
+      "type": "string",
+      "pattern": "^(0|[1-9][0-9]*)\\.(0|[1-9][0-9]*)\\.(0|[1-9][0-9]*)$"
+    },
+    "plugin": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": [
+        "slug",
+        "name",
+        "description",
+        "version",
+        "tag",
+        "entry",
+        "bundle",
+        "sha256",
+        "sizeBytes",
+        "capabilities"
+      ],
+      "properties": {
+        "slug": {
+          "$ref": "#/$defs/slug"
+        },
+        "name": {
+          "type": "string",
+          "minLength": 1,
+          "maxLength": 64
+        },
+        "description": {
+          "type": "string",
+          "minLength": 1,
+          "maxLength": 280
+        },
+        "version": {
+          "$ref": "#/$defs/version"
+        },
+        "tag": {
+          "type": "string",
+          "pattern": "^[a-z0-9][a-z0-9-]{1,63}@(0|[1-9][0-9]*)\\.(0|[1-9][0-9]*)\\.(0|[1-9][0-9]*)$"
+        },
+        "icon": {
+          "type": "string",
+          "pattern": "^plugins/[a-z0-9-]+/dist/.+"
+        },
+        "entry": {
+          "type": "string",
+          "pattern": "^plugins/[a-z0-9-]+/dist/index\\.html$"
+        },
+        "bundle": {
+          "type": "string",
+          "pattern": "^[a-z0-9-]+-bundle\\.zip$"
+        },
+        "sha256": {
+          "type": "string",
+          "pattern": "^[a-f0-9]{64}$"
+        },
+        "sizeBytes": {
+          "type": "integer",
+          "minimum": 1
+        },
+        "minAppVersion": {
+          "type": "string",
+          "pattern": "^[0-9]+\\.[0-9]+\\.[0-9]+-[0-9]{8}\\.[0-9]+$"
+        },
+        "capabilities": {
+          "type": "array",
+          "uniqueItems": true,
+          "items": {
+            "enum": ["stream", "fullscreen", "network"]
+          }
+        }
+      }
+    }
+  }
+}
