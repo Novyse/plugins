@@ -22,6 +22,10 @@ schema/
   manifest.schema.json        shape of dist/manifest.json
 scripts/
   validate-registry.mjs       dependency-free validator, run by CI
+packages/
+  app-sdk/                    @novyse/app-sdk: SDK types + the development host
+_template/
+  Preact + Vite + Tailwind scaffold, copy it to plugins/<slug> to start
 plugins/
   <slug>/
     plugin.json               source metadata (id, version, capabilities)
@@ -31,6 +35,21 @@ plugins/
   validate.yml                checks on every push and pull request
   release.yml                 publishes the bundle when a tag is pushed
 ```
+
+## Start a plugin
+
+`_template` is a working plugin: Preact, TypeScript, Vite, Tailwind, and a
+single-file build.
+
+```sh
+cp -r _template plugins/my-activity
+cd plugins/my-activity && npm install && npm run dev
+```
+
+`npm run dev` serves it standalone with the fake host of
+`@novyse/app-sdk/dev`: open it in two tabs and you have two participants, the
+`STATE` log, the `ACTION` channel and a late joiner, without the app. See
+[`_template/README.md`](_template/README.md).
 
 ## Publishing a plugin
 
