@@ -55,9 +55,17 @@ cd plugins/my-activity && npm install && npm run dev
 
 1. Build the plugin so that `plugins/<slug>/dist/index.html` is a single self-contained
    document (all CSS and JS inlined, no relative assets).
-2. Set the same `version` in `plugins/<slug>/plugin.json` and in `registry.json`, together
-   with `sha256` and `sizeBytes` of the bundle.
-3. Commit `src/`, `dist/`, `plugin.json` and `registry.json`.
+2. Run the bundler, which zips `dist/` deterministically and writes `sha256`,
+   `sizeBytes`, `tag` and the paths into `registry.json`:
+
+   ```sh
+   node scripts/bundle.mjs watch-together --update-registry
+   ```
+
+   The zip is store-only with fixed timestamps, so the digest is reproducible: the value
+   committed on `main` is the digest of the asset CI publishes, and the native clients
+   verify the download against it.
+3. Commit `src/`, `dist/`, `plugin.json`, `registry.json` and the tag of the release.
 4. Push the tag `<slug>@<version>`:
 
    ```sh
@@ -77,6 +85,7 @@ changes. A rollback is a new patch version pointing at the previous build.
 
 ```sh
 node scripts/validate-registry.mjs
+node scripts/bundle.mjs <slug> --check-registry
 ```
 
 ## License

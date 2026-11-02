@@ -24,21 +24,16 @@ jobs:
         run: node scripts/validate-registry.mjs
 
       - name: Package the bundle
+        id: bundle
         run: |
           set -euo pipefail
 
           tag="${GITHUB_REF_NAME}"
           slug="${tag%@*}"
           version="${tag#*@}"
-          dist="plugins/${slug}/dist"
 
-          if [ ! -f "${dist}/index.html" ]; then
-            echo "missing ${dist}/index.html: build the plugin and commit dist/ before tagging" >&2
-            exit 1
-          fi
-
-          if [ ! -f "${dist}/manifest.json" ]; then
-            echo "missing ${dist}/manifest.json" >&2
+          if [ ! -f "plugins/${slug}/dist/index.html" ]; then
+            echo "missing plugins/${slug}/dist/index.html: build the plugin and commit dist/ before tagging" >&2
             exit 1
           fi
 
@@ -48,10 +43,9 @@ jobs:
             exit 1
           fi
 
-          archive="${slug}-bundle.zip"
-          rm -f "${archive}"
-          (cd "${dist}" && zip -q -r "${GITHUB_WORKSPACE}/${archive}" .)
-          sha256sum "${archive}"
+          node scripts/bundle.mjs "${slug}" --check-registry
+
+          echo "archive=${slug}-bundle.zip" >> "$GITHUB_OUTPUT"
 
       - name: Publish the release
         env:
@@ -59,10 +53,10 @@ jobs:
         run: |
           set -euo pipefail
 
-          tag="${GITHUB_REF_NAME}"
+          tag="${GITHUB_REF_NAME}"  
           slug="${tag%@*}"
           version="${tag#*@}"
 
-          gh release create "${tag}" "${ARCHIVE}" \
+          gh release create "${tag}" "${{ steps.bundle.outputs.archive }}" \
             --title "${slug} ${version}" \
             --notes "Source: https://github.com/${GITHUB_REPOSITORY}/tree/${tag}"

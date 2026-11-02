@@ -1,0 +1,8 @@
+{
+  "id": "watch-together",
+  "name": "Watch Together",
+  "description": "Watch a YouTube video together, in sync, from inside the voice room.",
+  "version": "0.1.0",
+  "capabilities": [],
+  "author": "Novyse"
+}
