@@ -6,5 +6,11 @@
   "version": "0.1.0",
   "entry": "index.html",
   "capabilities": [],
-  "author": "Novyse"
+  "author": "Novyse",
+  "permissions": {
+    "frame": [
+      "https://www.youtube.com",
+      "https://www.youtube-nocookie.com"
+    ]
+  }
 }
