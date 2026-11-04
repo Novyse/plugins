@@ -13,6 +13,7 @@ const source = JSON.parse(readFileSync(resolve(here, 'plugin.json'), 'utf8')) as
   description?: string;
   version: string;
   capabilities?: string[];
+  permissions?: { frame?: string[] };
   author?: string;
 };
 
@@ -37,6 +38,7 @@ function manifest(): Plugin {
             entry: 'index.html',
             capabilities: source.capabilities ?? [],
             ...(source.author ? { author: source.author } : {}),
+            ...(source.permissions ? { permissions: source.permissions } : {}),
           },
           null,
           2,

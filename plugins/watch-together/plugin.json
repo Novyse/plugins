@@ -4,5 +4,11 @@
   "description": "Watch a YouTube video together, in sync, from inside the voice room.",
   "version": "0.1.0",
   "capabilities": [],
-  "author": "Novyse"
+  "author": "Novyse",
+  "permissions": {
+    "frame": [
+      "https://www.youtube.com",
+      "https://www.youtube-nocookie.com"
+    ]
+  }
 }

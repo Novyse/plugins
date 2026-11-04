@@ -52,6 +52,23 @@
     "author": {
       "type": "string",
       "maxLength": 120
+    },
+    "permissions": {
+      "type": "object",
+      "additionalProperties": false,
+      "description": "What the plugin needs beyond the sandbox defaults. Each grant asked here shows up in the install screen of the app.",
+      "properties": {
+        "frame": {
+          "type": "array",
+          "uniqueItems": true,
+          "maxItems": 8,
+          "description": "Origins the plugin loads into a frame, e.g. its video player. `https://host`, `https://host:port` or `https://*.host`: no path, no query, https only. A wildcard never covers the apex and must name a registrable domain, so `*.example.com` is fine and `*.com` is not. The client is the authority: an entry it rejects is dropped, never the plugin.",
+          "items": {
+            "type": "string",
+            "pattern": "^https://(\\*\\.)?[a-z0-9]([a-z0-9-]*[a-z0-9])?(\\.[a-z0-9]([a-z0-9-]*[a-z0-9])?)+(:[0-9]{1,5})?/?$"
+          }
+        }
+      }
     }
   }
 }
