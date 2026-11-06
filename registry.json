@@ -34,6 +34,34 @@
           "https://www.twitch.tv"
         ]
       }
+    },
+    {
+      "slug": "excalidraw",
+      "name": "Excalidraw",
+      "author": "Novyse",
+      "description": "A shared Excalidraw whiteboard, one per voice room: everyone draws on the same board, every stroke in sync.",
+      "version": "0.1.0",
+      "tag": "excalidraw@0.1.0",
+      "icon": "plugins/excalidraw/store/icon.png",
+      "banner": "plugins/excalidraw/store/banner.png",
+      "entry": "plugins/excalidraw/dist/index.html",
+      "bundle": "excalidraw-bundle.zip",
+      "sha256": "4ba59eb2d1f163d531ed908584b78a753b13e1935b9dccc1ea0837c9898ac8aa",
+      "sizeBytes": 7664572,
+      "capabilities": [
+        "stream"
+      ],
+      "locales": [
+        "en",
+        "it"
+      ],
+      "permissions": {
+        "channels": [
+          "state",
+          "action",
+          "stream"
+        ]
+      }
     }
   ]
 }
