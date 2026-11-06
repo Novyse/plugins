@@ -16,6 +16,8 @@ const VERSION = /^(0|[1-9][0-9]*)\.(0|[1-9][0-9]*)\.(0|[1-9][0-9]*)$/;
 const SHA256 = /^[a-f0-9]{64}$/;
 const MIN_APP = /^[0-9]+\.[0-9]+\.[0-9]+-[0-9]{8}\.[0-9]+$/;
 const CAPABILITIES = new Set(['stream', 'fullscreen', 'network']);
+const CHANNELS = new Set(['state', 'action', 'stream']);
+const LOCALE = /^[a-z]{2,3}(-[A-Z][a-z]{3})?(-[A-Z]{2})?$/;
 
 const problems = [];
 const fail = (message) => problems.push(message);
@@ -63,6 +65,8 @@ for (const [index, plugin] of plugins.entries()) {
     'sha256',
     'sizeBytes',
     'capabilities',
+    'locales',
+    'permissions',
   ]) {
     if (plugin[field] === undefined) {
       fail(`${at}.${field} is required`);
@@ -98,6 +102,50 @@ for (const [index, plugin] of plugins.entries()) {
 
   if (plugin.icon !== undefined && !existsSync(join(root, plugin.icon))) {
     fail(`${at}.icon does not exist: ${plugin.icon}`);
+  }
+
+  if (plugin.banner !== undefined && !existsSync(join(root, plugin.banner))) {
+    fail(`${at}.banner does not exist: ${plugin.banner}`);
+  }
+
+  if (plugin.locales !== undefined) {
+    if (!Array.isArray(plugin.locales) || plugin.locales.length === 0) {
+      fail(`${at}.locales must be a non-empty array`);
+    } else {
+      for (const locale of plugin.locales) {
+        if (typeof locale !== 'string' || !LOCALE.test(locale)) {
+          fail(`${at}.locales has an invalid tag: ${JSON.stringify(locale)}`);
+        }
+      }
+
+      if (!plugin.locales.includes('en')) {
+        fail(`${at}.locales must include "en", the fallback of every plugin`);
+      }
+    }
+  }
+
+  if (plugin.permissions !== undefined) {
+    if (typeof plugin.permissions !== 'object' || plugin.permissions === null) {
+      fail(`${at}.permissions must be an object`);
+    } else {
+      const channels = plugin.permissions.channels;
+
+      if (channels !== undefined) {
+        if (!Array.isArray(channels)) {
+          fail(`${at}.permissions.channels must be an array`);
+        } else {
+          for (const channel of channels) {
+            if (!CHANNELS.has(channel)) {
+              fail(`${at}.permissions.channels has an unknown value: ${channel}`);
+            }
+          }
+        }
+      }
+
+      if (plugin.permissions.frame !== undefined && !Array.isArray(plugin.permissions.frame)) {
+        fail(`${at}.permissions.frame must be an array`);
+      }
+    }
   }
 
   if (plugin.bundle !== `${plugin.slug}-bundle.zip`) {
@@ -143,10 +191,57 @@ for (const [index, plugin] of plugins.entries()) {
           `${at}.version ${plugin.version} does not match plugins/${plugin.slug}/plugin.json ${manifest.version}`,
         );
       }
+
+      // The registry is generated from the manifest: a difference means the
+      // bundler was not run after the manifest changed, and the store would
+      // show a permission the build never asked for.
+      const locales = Array.isArray(manifest.locales) ? manifest.locales : [];
+
+      if (!locales.includes('en')) {
+        fail(`plugins/${plugin.slug}/plugin.json locales must include "en"`);
+      }
+
+      if (!Array.isArray(manifest.permissions?.channels)) {
+        fail(`plugins/${plugin.slug}/plugin.json needs permissions.channels`);
+      }
+
+      if (!sameList(locales, plugin.locales ?? [])) {
+        fail(`${at}.locales does not match plugins/${plugin.slug}/plugin.json`);
+      }
+
+      const channels = Array.isArray(manifest.permissions?.channels)
+        ? manifest.permissions.channels
+        : [];
+      const registryChannels = Array.isArray(plugin.permissions?.channels)
+        ? plugin.permissions.channels
+        : [];
+
+      if (!sameList(channels, registryChannels)) {
+        fail(`${at}.permissions.channels does not match plugins/${plugin.slug}/plugin.json`);
+      }
+
+      const capabilities = Array.isArray(manifest.capabilities)
+        ? manifest.capabilities
+        : [];
+
+      if (!sameList(capabilities, plugin.capabilities)) {
+        fail(`${at}.capabilities does not match plugins/${plugin.slug}/plugin.json`);
+      }
     } catch (error) {
       fail(`plugins/${plugin.slug}/plugin.json is not valid JSON: ${error.message}`);
     }
   }
+}
+
+/** Order-insensitive comparison of two lists of strings. */
+function sameList(left, right) {
+  if (!Array.isArray(left) || !Array.isArray(right)) return false;
+  if (left.length !== right.length) return false;
+
+  const expected = [...left].sort();
+  const actual = [...right].sort();
+
+  return expected.every((value, index) => value === actual[index]);
 }
 
 if (problems.length > 0) {
