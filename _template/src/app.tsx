@@ -6,6 +6,8 @@ import {
   type StateEvent,
 } from '@novyse/app-sdk';
 
+import { messagesFor, normalizeLocale, type Locale } from './i18n';
+
 /** The only STATE mutation of this activity. */
 const COUNTER = 'COUNTER';
 
@@ -43,7 +45,9 @@ export function App() {
   const [count, setCount] = useState(0);
   const [pings, setPings] = useState(0);
   const [lastPing, setLastPing] = useState<string | null>(null);
-  const [error, setError] = useState<string | null>(null);
+  const [error, setError] = useState<string | null>(null);.
+  const [locale, setLocale] = useState<Locale>(() => normalizeLocale(navigator.language));
+  const t = messagesFor(locale);
 
   useEffect(() => {
     let alive = true;
@@ -55,6 +59,7 @@ export function App() {
         if (!alive) return;
 
         setInit(payload);
+        setLocale(normalizeLocale(payload.locale));
         setParticipants(payload.participants);
         setCount(latestCounter(payload.state.events));
       })
@@ -75,7 +80,9 @@ export function App() {
     });
 
     const offParticipants = sdk.onParticipants(setParticipants);
-    const offEnded = sdk.onEnded((reason) => setError(`Activity ended (${reason}).`));
+    const offEnded = sdk.onEnded((reason) =>
+      setError(messagesFor(normalizeLocale(init?.locale)).ended(reason)),
+    );
 
     return () => {
       alive = false;
@@ -119,15 +126,14 @@ export function App() {
   return (
     <main class="flex h-full flex-col gap-3 bg-neutral-950 p-4 text-neutral-100">
       <header class="flex items-baseline justify-between gap-2">
-        <h1 class="text-base font-semibold">Hello Activity</h1>
+        <h1 class="text-base font-semibold">{t.title}</h1>
         <span class="text-xs text-neutral-400">
           v{init?.plugin.version ?? '…'}
         </span>
       </header>
 
       <p class="text-xs text-neutral-400">
-        Room {init?.room.chatUUID ?? '…'} · sub {init?.room.subID ?? 0} · you are{' '}
-        <span class="text-neutral-200">{init?.self ?? '…'}</span>
+        {t.room(init?.room.chatUUID ?? '…', init?.room.subID ?? 0, init?.self ?? '…')}
       </p>
 
       <ul class="flex flex-wrap gap-1">
@@ -150,7 +156,7 @@ export function App() {
           onClick={increment}
           disabled={readOnly}
         >
-          +1
+          {t.increment}
         </button>
 
         <button
@@ -159,21 +165,20 @@ export function App() {
           onClick={ping}
           disabled={readOnly}
         >
-          Ping
+          {t.ping}
         </button>
 
         <span class="ml-auto text-xs text-neutral-400">
-          {pings} ping{pings === 1 ? '' : 's'}
-          {lastPing ? ` · last from ${lastPing}` : ''}
+          {t.pings(pings)}
+          {lastPing ? ` · ${t.lastFrom(lastPing)}` : ''}
         </span>
       </section>
 
       <footer class="mt-auto flex items-center justify-between text-[11px] text-neutral-500">
         <span>
-          {init?.state.events.length ?? 0} events
-          {init?.state.truncated ? ' (trimmed)' : ''}
+          {t.events(init?.state.events.length ?? 0, init?.state.truncated ?? false)}
         </span>
-        <span>{readOnly ? 'read only' : 'live'}</span>
+        <span>{readOnly ? t.readOnly : t.live}</span>
       </footer>
 
       {error ? (
