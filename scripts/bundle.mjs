@@ -5,7 +5,7 @@
 // The zip is written here, byte for byte, by a store-only writer with fixed
 // timestamps and sorted entries: the same dist produces the same archive on
 // every machine and in CI. That is what makes the `sha256` in registry.json
-// meaningful — the native clients verify the download against it, so a zip
+// meaningful, the native clients verify the download against it, so a zip
 // created by `zip(1)` (which embeds mtimes) would never match twice.
 //
 // Usage:
@@ -53,20 +53,25 @@ writeFileSync(archivePath, archive);
 const sha256 = createHash('sha256').update(archive).digest('hex');
 const sizeBytes = archive.length;
 
-const iconPath = join(distDir, 'icon.png');
+const iconPath = join(pluginDir, 'store', 'icon.png');
+const bannerPath = join(pluginDir, 'store', 'banner.png');
 const entry = {
   slug,
   name: source.name,
+  ...(source.author ? { author: source.author } : {}),
   description: source.description,
   version: source.version,
   tag: `${slug}@${source.version}`,
-  ...(existsSync(iconPath) ? { icon: `plugins/${slug}/dist/icon.png` } : {}),
+  ...(existsSync(iconPath) ? { icon: `plugins/${slug}/store/icon.png` } : {}),
+  ...(existsSync(bannerPath) ? { banner: `plugins/${slug}/store/banner.png` } : {}),
   entry: `plugins/${slug}/dist/index.html`,
   bundle: archiveName,
   sha256,
   sizeBytes,
   ...(source.minAppVersion ? { minAppVersion: source.minAppVersion } : {}),
   capabilities: source.capabilities ?? [],
+  ...(source.locales ? { locales: source.locales } : {}),
+  ...(source.permissions ? { permissions: source.permissions } : {}),
 };
 
 const registryPath = join(root, 'registry.json');
