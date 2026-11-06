@@ -6,14 +6,34 @@
     {
       "slug": "watch-together",
       "name": "Watch Together",
-      "description": "Watch a YouTube video together, in sync, from inside the voice room.",
-      "version": "0.1.0",
-      "tag": "watch-together@0.1.0",
+      "author": "Novyse",
+      "description": "Watch YouTube, Twitch or a video file together, in sync, from inside the voice room.",
+      "version": "0.2.0",
+      "tag": "watch-together@0.2.0",
+      "icon": "plugins/watch-together/store/icon.png",
+      "banner": "plugins/watch-together/store/banner.png",
       "entry": "plugins/watch-together/dist/index.html",
       "bundle": "watch-together-bundle.zip",
-      "sha256": "e08d4c48c855e711bc23c9e145c5fc931e3dc9afc3e82d00ee13434667067bad",
-      "sizeBytes": 37216,
-      "capabilities": []
+      "sha256": "6b9f3aea21ae332d1ca1a05f574e0af2173154e610d9ad92c5f809aba89acf80",
+      "sizeBytes": 51980,
+      "capabilities": [
+        "network"
+      ],
+      "locales": [
+        "en",
+        "it"
+      ],
+      "permissions": {
+        "channels": [
+          "state"
+        ],
+        "frame": [
+          "https://www.youtube.com",
+          "https://www.youtube-nocookie.com",
+          "https://player.twitch.tv",
+          "https://www.twitch.tv"
+        ]
+      }
     }
   ]
 }
