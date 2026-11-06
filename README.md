@@ -28,9 +28,10 @@ _template/
   Preact + Vite + Tailwind scaffold, copy it to plugins/<slug> to start
 plugins/
   <slug>/
-    plugin.json               source metadata (id, version, capabilities)
+    plugin.json               source metadata (id, version, locales, capabilities, permissions)
     src/                      sources (React/Preact/TS/...)
-    dist/                     built bundle: index.html, manifest.json, icon.png
+    dist/                     built bundle: index.html, manifest.json
+    store/                    store art: icon.png, banner.png, screenshots
 .github/workflows/
   validate.yml                checks on every push and pull request
   release.yml                 publishes the bundle when a tag is pushed
@@ -50,6 +51,117 @@ cd plugins/my-activity && npm install && npm run dev
 `@novyse/app-sdk/dev`: open it in two tabs and you have two participants, the
 `STATE` log, the `ACTION` channel and a late joiner, without the app. See
 [`_template/README.md`](_template/README.md).
+
+## Localization
+
+A plugin is translated in the bundle, not on the server: the app sends its
+language and the plugin picks the table.
+
+1. list the languages in `plugin.json`, `en` is mandatory and is the fallback:
+
+   ```json
+   "locales": ["en", "it"]
+   ```
+
+2. the host passes the language in `init()`:
+
+   ```ts
+   const init = await sdk.init(); // init.locale: "it-IT"
+   ```
+
+   It is a BCP-47 tag, never a language the manifest does not declare. Match on
+   the base language (`it-IT` → `it`) and fall back to `en` for anything else;
+   `src/i18n.ts` in the template and in `watch-together` does exactly that and
+   can be copied.
+
+3. `npm run dev` accepts `?lang=it` on the URL, so the other language can be
+   checked without changing the system locale.
+
+The first frame is rendered before `init()` answers: start from
+`navigator.language` (or English) and switch when `init` resolves. Text that
+does not change with the language (names of the platforms, for example) still
+belongs in the table.
+
+## Capabilities and permissions
+
+Both live in `plugin.json` and reach the store through `registry.json`, so the
+app can show them before a plugin is installed.
+
+| Field | Values | Meaning |
+| :--- | :--- | :--- |
+| `capabilities` | `stream`, `fullscreen`, `network` | Host features. `stream` gates `sdk.stream.send` (the app refuses it otherwise); `fullscreen` gates `ui.requestFullscreen`; `network` declares resources loaded from outside the sandbox, whose allowlist is `permissions.frame`. Empty is valid and means none. |
+| `permissions.channels` | `state`, `action`, `stream` | The communication channels the plugin writes to. Required: the app refuses a write on a channel that is not listed. |
+| `permissions.frame` | `https://host`, `https://*.host`, with an optional port | Origins the plugin loads into an iframe. No path, no query, https only; at most 8. |
+
+```json
+{
+  "capabilities": ["network"],
+  "permissions": {
+    "channels": ["state"],
+    "frame": ["https://www.youtube.com"]
+  }
+}
+```
+
+Keep the lists honest: `scripts/validate-registry.mjs` checks that they are
+well formed and that `registry.json` mirrors them, but only the code review can
+see whether a plugin writes on a channel it did not declare.
+
+## Store assets
+
+| File | Size | Used as |
+| :--- | :--- | :--- |
+| `store/icon.png` | 512×512 PNG, transparent background | the logo: 44 px in the store card, 64 px on the plugin page. |
+| `store/banner.png` | 1600×600 PNG | the banner of the card and of the plugin page. |
+| screenshots | 1920×1080 PNG | inside `README.md`, stacked, rendered by the plugin page. |
+
+`store/` is committed and never zipped: `bundle.mjs` copies `icon` and `banner`
+into `registry.json` only when the files exist, so a plugin without art still
+builds and the store falls back to a gradient and to the initial of the name.
+Keep them out of `dist/`: the build empties that directory.
+
+The card overlays the logo at the bottom-left and the name plus a two-line
+preview of the description at the bottom, so keep that band of the banner free
+of detail. The app crops with `BoxFit.cover`: the centre of the image is always
+visible, the extremes are not.
+
+Screenshots are not a separate field. Put them in the README, one below the
+other, as absolute URLs, the plugin page renders the README of the release and
+would resolve a relative path against nothing:
+
+```md
+![Shared player](./store/screen-1.png)
+```
+
+becomes
+
+```md
+![Shared player](https://raw.githubusercontent.com/Novyse/plugins/main/plugins/<slug>/store/screen-1.png)
+```
+
+Pinning the tag instead of `main` is fine and reproducible; a screenshot rarely
+changes between releases, so `main` keeps the README free of per-release edits.
+
+## The plugin page
+
+The store lists the library as cards; the info button of a card opens the page
+of that plugin, which renders the README of the release and, next to it, the
+metadata from the registry: version, author, size, minimum app version,
+languages, capabilities and permissions. Screenshots and any other content are
+therefore the README's own, with no field to keep in sync.
+
+The README **is** that page, so write it for the person in the store:
+
+1. the name of the plugin as the title, then one sentence on what it does;
+2. a screenshot right after it, as an absolute URL (see above);
+3. how to use it: what can be opened or pasted, what is shared between the
+   participants, and the limits in a line;
+4. nothing about the internals: no event schema, no build commands, no API
+   notes.
+
+The technical notes stay next to the sources instead, in a `DEVELOPING.md`:
+see [`plugins/watch-together/DEVELOPING.md`](plugins/watch-together/DEVELOPING.md)
+for an example.
 
 ## Publishing a plugin
 
