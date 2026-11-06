@@ -54,6 +54,15 @@ export interface InitPayload {
   readOnly: boolean;
   /** Declared in `plugin.json`, reviewed with the code. */
   capabilities: string[];
+  /**
+   * Language of the host, as a BCP-47 tag (`it-IT`, `en-GB`, ...).
+   *
+   * The plugin lists the languages it has in `plugin.json` (`locales`) and
+   * must fall back to `en` for a tag it does not know: the host never sends a
+   * language the plugin did not declare, but a client older than the manifest
+   * may still send one it does not have.
+   */
+  locale: string;
   state: {
     /** Last sequence number assigned to the activity. */
     seq: number;
@@ -71,6 +80,7 @@ export type ErrorCode =
   | 'E_NOT_IN_ROOM'
   | 'E_CAPABILITY'
   | 'E_NETWORK'
+  | 'E_UNSUPPORTED'
   | 'E_INTERNAL';
 
 export interface SdkError extends Error {
@@ -117,6 +127,23 @@ export interface AppSDK {
     requestFullscreen(): void;
     exitFullscreen(): void;
     close(): void;
+  };
+
+  /**
+   * The video of a file link, played by the app itself.
+   *
+   * A plugin lives in a WebView: it can embed a page, not decode a video. So a
+   * direct `https://…/video.mp4` is handed to the app, which plays it with the
+   * same native player the chat uses and renders it above the sandbox of this
+   * activity. Only `http(s)` urls: a path of the device is never opened.
+   */
+  player: {
+    /** Resolves once the player accepted the url; it starts paused. */
+    open(url: string): Promise<void>;
+    /** Closes the player of this activity, if one is open. */
+    close(): Promise<void>;
+    /** The user closed the player from the chrome of the app. */
+    onClosed(callback: () => void): () => void;
   };
 
   storage: {
