@@ -2,16 +2,24 @@ import { useEffect, useRef, useState } from 'preact/hooks';
 
 import { getAppSDK, type InitPayload } from '@novyse/app-sdk';
 
+import { EmbedError, SEEK_INTENT, type Embed, type EmbedCallbacks } from './embed';
+import { messagesFor, normalizeLocale, type Locale, type Messages } from './i18n';
 import {
   PLAYBACK,
-  formatTime,
+  detect,
   latestPlayback,
-  parseVideoId,
+  playbackFromEvent,
   positionAt,
+  type DetectionReason,
   type Playback,
   type PlaybackSnapshot,
+  type Source,
 } from './state';
-import { createPlayer, type Player } from './youtube';
+import { createTwitch } from './twitch';
+import { createYouTube } from './youtube';
+
+/** Every how often the local player is compared with the room, in ms. */
+const TICK_MS = 500;
 
 export function App() {
   const sdk = getAppSDK();
@@ -19,29 +27,61 @@ export function App() {
   const [init, setInit] = useState<InitPayload | null>(null);
   const [snapshot, setSnapshot] = useState<PlaybackSnapshot | null>(null);
   const [clockOffset, setClockOffset] = useState(0);
-  const [now, setNow] = useState(() => Date.now());
+
+  const [screen, setScreen] = useState<'input' | 'video'>('input');
   const [link, setLink] = useState('');
-  const [editing, setEditing] = useState(false);
-  const [error, setError] = useState<string | null>(null);
+  const [linkError, setLinkError] = useState<string | null>(null);
+  const [touched, setTouched] = useState(false);
 
-  const [playerReady, setPlayerReady] = useState(false);
-  const [playerFailed, setPlayerFailed] = useState(false);
-  const [autoplayBlocked, setAutoplayBlocked] = useState(false);
+  const [ready, setReady] = useState(false);
+  const [embedError, setEmbedError] = useState<string | null>(null);
 
-  const [seeking, setSeeking] = useState<number | null>(null);
+  const [locale, setLocale] = useState<Locale>(() => normalizeLocale(navigator.language));
 
   const hostRef = useRef<HTMLDivElement>(null);
-  const playerRef = useRef<Player | null>(null);
-  const loadedVideoRef = useRef<string | null>(null);
+  const embedRef = useRef<Embed | null>(null);
   const snapshotRef = useRef<PlaybackSnapshot | null>(null);
+  const initRef = useRef<InitPayload | null>(null);
   const offsetRef = useRef(0);
+  const lastSeqRef = useRef(0);
+  const lastSourceRef = useRef<string | null>(null);
 
-  offsetRef.current = clockOffset;
+  const t = messagesFor(locale);
+  const messagesRef = useRef<Messages>(t);
+
   snapshotRef.current = snapshot;
+  initRef.current = init;
+  offsetRef.current = clockOffset;
+  messagesRef.current = t;
 
   const serverNow = () => Date.now() + offsetRef.current;
   const readOnly = init?.readOnly ?? false;
-  const position = seeking ?? positionAt(snapshot, now);
+
+  /** Writes a snapshot of the room, if this user may. */
+  const publish = async (patch: Partial<Playback>): Promise<boolean> => {
+    const payload = initRef.current;
+    if (!payload || payload.readOnly) return false;
+
+    const base = snapshotRef.current;
+    const source = patch.source ?? base?.source;
+    if (!source) return false;
+
+    const next: Playback = {
+      source,
+      playing: patch.playing ?? base?.playing ?? false,
+      position: patch.position ?? positionAt(base, serverNow()),
+    };
+
+    setLinkError(null);
+
+    try {
+      await sdk.state.send(PLAYBACK, next);
+      return true;
+    } catch (cause) {
+      setLinkError(describe(cause, messagesRef.current));
+      return false;
+    }
+  };
 
   // Lifecycle: the snapshot, then every change of the room.
   useEffect(() => {
@@ -52,25 +92,46 @@ export function App() {
       .then((payload) => {
         if (!alive) return;
 
+        const last = latestPlayback(payload.state.events);
+
+        initRef.current = payload;
+        offsetRef.current = payload.serverNow - Date.now();
+
+        lastSeqRef.current = payload.state.seq;
+        lastSourceRef.current = last?.source.url ?? null;
+
         setInit(payload);
+        setLocale(normalizeLocale(payload.locale));
         setClockOffset(payload.serverNow - Date.now());
-        setSnapshot(latestPlayback(payload.state.events));
+        setSnapshot(last);
+        setScreen(last ? 'video' : 'input');
       })
       .catch((cause: unknown) => {
-        if (!alive) return;
-        setError(cause instanceof Error ? cause.message : String(cause));
+        if (alive) setLinkError(describe(cause, messagesRef.current));
       });
 
+    // The log comes back to the sender too: the sequence number is what makes
+    // a duplicate a no-op instead of a double apply.
     const offState = sdk.state.on<Playback>(PLAYBACK, (event) => {
-      const data = event.data;
-      if (!data?.videoId) return;
+      if (event.seq <= lastSeqRef.current) return;
 
-      setSnapshot({
-        videoId: data.videoId,
-        playing: Boolean(data.playing),
-        position: Math.max(0, Number(data.position) || 0),
-        updatedAt: event.ts,
-      });
+      const next = playbackFromEvent(event);
+      if (!next) return;
+
+      lastSeqRef.current = event.seq;
+
+      const changed = lastSourceRef.current !== next.source.url;
+      lastSourceRef.current = next.source.url;
+
+      setSnapshot(next);
+      if (changed) setScreen('video');
+    });
+
+    // The app player was closed from its back button: back to the first screen.
+    const offPlayer = sdk.player.onClosed(() => {
+      setEmbedError(null);
+      setReady(false);
+      setScreen('input');
     });
 
     const offParticipants = sdk.onParticipants(() => {
@@ -78,276 +139,360 @@ export function App() {
     });
 
     const offEnded = sdk.onEnded(() => {
-      setError('The activity was closed.');
+      setLinkError(messagesRef.current.activityClosed);
     });
 
     return () => {
       alive = false;
       offState();
+      offPlayer();
       offParticipants();
       offEnded();
     };
   }, []);
 
-  // The player is created once, in the element that stays mounted.
+  // Mounts the player of the current source, once per source.
+  //
+  // A YouTube video is an iframe driven by its API. A file is not played here
+  // at all: the app owns media_kit, renders it above this sandbox and tells us
+  // when its back button is pressed.
   useEffect(() => {
-    if (!init || !hostRef.current) return;
+    if (!init || !snapshot || screen !== 'video') return;
+
+    const source = snapshot.source;
+
+    setEmbedError(null);
+
+    if (source.kind === 'file') {
+      let disposed = false;
+
+      sdk.player.open(source.url).catch((cause: unknown) => {
+        if (!disposed) setEmbedError(describe(cause, messagesRef.current));
+      });
+
+      return () => {
+        disposed = true;
+        void sdk.player.close().catch(() => undefined);
+      };
+    }
+
+    const host = hostRef.current;
+    if (!host) return;
 
     let disposed = false;
+    let embed: Embed | null = null;
 
-    createPlayer(hostRef.current, {
-      onUnavailable: (code) => {
-        setPlayerFailed(true);
-        setError(`YouTube refused this video (code ${code}).`);
+    const callbacks: EmbedCallbacks = {
+      onReady: () => {
+        if (!disposed) setReady(true);
       },
-    })
-      .then((player) => {
+      onError: (error: EmbedError) => {
+        if (!disposed) setEmbedError(describe(error, messagesRef.current));
+      },
+      onIntent: (playing: boolean, position: number) => {
+        if (disposed) return;
+        void publish({ source, playing, position });
+      },
+    };
+
+    const creation =
+      source.kind === 'youtube'
+        ? createYouTube(host, source, callbacks)
+        : createTwitch(
+            host,
+            source,
+            callbacks,
+            snapshotRef.current?.playing ?? false,
+          );
+
+    creation
+      .then((created) => {
         if (disposed) {
-          player.destroy();
+          created.destroy();
           return;
         }
 
-        playerRef.current = player;
-        setPlayerReady(true);
+        embed = created;
+        embedRef.current = created;
+
+        const current = snapshotRef.current;
+        created.load(positionAt(current, serverNow()), current?.playing ?? false);
       })
       .catch((cause: unknown) => {
-        if (disposed) return;
-
-        setPlayerFailed(true);
-        setError(cause instanceof Error ? cause.message : String(cause));
+        if (!disposed) setEmbedError(describe(cause, messagesRef.current));
       });
 
     return () => {
       disposed = true;
-      playerRef.current?.destroy();
-      playerRef.current = null;
+      embed?.destroy();
+
+      if (embedRef.current === embed) embedRef.current = null;
     };
-  }, [init !== null]);
+  }, [init !== null, screen, snapshot?.source.url]);
 
-  // Reconciliation: every snapshot is applied to the local player.
+  // A position coming from the room is applied once, when the event arrives;
+  // the player then advances on its own. Recomputing it every tick is what
+  // turns a slow buffer into an endless seek.
   useEffect(() => {
-    const player = playerRef.current;
-    if (!player || !snapshot) return;
+    if (!snapshot || screen !== 'video' || snapshot.source.kind === 'file') return;
 
-    if (loadedVideoRef.current !== snapshot.videoId) {
-      loadedVideoRef.current = snapshot.videoId;
-      player.load(snapshot.videoId, positionAt(snapshot, serverNow()), snapshot.playing);
-      return;
+    const embed = embedRef.current;
+    if (!embed) return;
+
+    const expected = positionAt(snapshot, serverNow());
+    if (Math.abs(embed.state().position - expected) > SEEK_INTENT) {
+      embed.seek(expected);
     }
+  }, [snapshot?.seq]);
 
-    player.apply(snapshot.playing, positionAt(snapshot, serverNow()), snapshot.videoId);
-  }, [snapshot, playerReady]);
-
-  // Coarse clock: re-renders the progress bar and nudges a drifting player.
+  // Reconciliation: only play and pause are applied all the time; a position
+  // is a one-off event, handled above. `tick` reports a seek made with the
+  // player's own controls.
   useEffect(() => {
+    if (!snapshot || screen !== 'video' || snapshot.source.kind === 'file') return;
+
     const timer = window.setInterval(() => {
-      setNow(Date.now());
-
-      const player = playerRef.current;
+      const embed = embedRef.current;
       const current = snapshotRef.current;
-      if (!player || !current) return;
+      if (!embed || !current) return;
 
-      if (!current.playing) {
-        setAutoplayBlocked(false);
-        return;
-      }
-
-      const target = positionAt(current, serverNow());
-
-      if (Math.abs(player.position() - target) > 1.5) {
-        player.apply(true, target, current.videoId);
-      }
-
-      setAutoplayBlocked(!player.playing());
-    }, 2000);
+      embed.apply(current.playing);
+      embed.tick();
+    }, TICK_MS);
 
     return () => window.clearInterval(timer);
-  }, []);
+  }, [screen, snapshot?.source.url]);
 
-  const publish = async (patch: Partial<Playback>) => {
-    if (!init || readOnly) return;
+  // No chrome over the player: Escape is the shortcut back to the input.
+  useEffect(() => {
+    if (screen !== 'video') return;
 
-    const base = snapshot;
-    const next: Playback = {
-      videoId: patch.videoId ?? base?.videoId ?? '',
-      playing: patch.playing ?? base?.playing ?? false,
-      position: patch.position ?? positionAt(base, serverNow()),
+    const onKey = (event: KeyboardEvent) => {
+      if (event.key !== 'Escape') return;
+
+      event.preventDefault();
+      backToInput();
     };
 
-    if (!next.videoId) return;
+    window.addEventListener('keydown', onKey);
+    return () => window.removeEventListener('keydown', onKey);
+  }, [screen]);
 
-    setError(null);
+  const submit = async () => {
+    setTouched(true);
 
-    try {
-      await sdk.state.send(PLAYBACK, next);
-    } catch (cause) {
-      setError(cause instanceof Error ? cause.message : String(cause));
-    }
-  };
+    const result = detect(link);
 
-  const loadVideo = async () => {
-    const id = parseVideoId(link);
-
-    if (!id) {
-      setError('That is not a YouTube link.');
+    if (!result.ok) {
+      setLinkError(reasonMessage(result.reason, t));
       return;
     }
 
-    setLink('');
-    setEditing(false);
-    await publish({ videoId: id, playing: false, position: 0 });
-  };
-
-  const toggle = () => {
-    void publish({
-      playing: !(snapshot?.playing ?? false),
-      position: positionAt(snapshot, serverNow()),
+    const published = await publish({
+      source: result.source,
+      playing: false,
+      position: 0,
     });
+
+    if (!published) return;
+
+    lastSourceRef.current = result.source.url;
+
+    setLink('');
+    setLinkError(null);
+    setTouched(false);
+    setScreen('video');
   };
 
-  const commitSeek = (seconds: number) => {
-    setSeeking(null);
-    void publish({ position: seconds });
+  const backToInput = () => {
+    setEmbedError(null);
+    setReady(false);
+    setLink('');
+    setLinkError(null);
+    setTouched(false);
+    setScreen('input');
   };
 
-  const hasVideo = Boolean(snapshot?.videoId);
+  const detection = detect(link);
+  const detected = detection.ok ? detection.source : null;
+  const shownError =
+    linkError ?? (touched && !detection.ok ? reasonMessage(detection.reason, t) : null);
 
-  return (
-    <main class="relative flex h-full flex-col bg-black text-neutral-100">
-      {/* The player lives here for the whole life of the tile. */}
-      <div ref={hostRef} class="absolute inset-0 [&>iframe]:h-full [&>iframe]:w-full" />
-
-      {!hasVideo ? (
-        <div class="relative z-10 m-auto w-full max-w-sm rounded-xl bg-neutral-900/90 p-4 shadow-lg backdrop-blur">
-          <h1 class="text-base font-semibold">Watch together</h1>
-          <p class="mt-1 text-xs text-neutral-400">
-            Paste a YouTube link: everyone in the room will watch the same video.
-          </p>
-
-          {readOnly ? (
-            <p class="mt-3 rounded bg-neutral-800 px-2 py-1.5 text-[11px] text-neutral-400">
-              You can watch, but only members who can start activities can pick the video.
-            </p>
-          ) : (
-            <div class="mt-3 flex gap-2">
+  if (!snapshot || screen === 'input') {
+    return (
+      <main class="flex h-full items-center justify-center bg-black px-5 text-neutral-100">
+        <div class="w-full max-w-md">
+          <form
+            onSubmit={(event) => {
+              event.preventDefault();
+              void submit();
+            }}
+          >
+            <div class="flex items-center gap-2 rounded-full border border-neutral-800 bg-neutral-900 py-1.5 pl-4 pr-1.5 focus-within:border-neutral-600">
               <input
-                class="min-w-0 flex-1 rounded-md border border-neutral-700 bg-neutral-800 px-2 py-1.5 text-sm outline-none focus:border-sky-500"
-                placeholder="https://youtu.be/…"
+                class="min-w-0 flex-1 bg-transparent text-sm outline-none placeholder:text-neutral-600 disabled:opacity-60"
+                placeholder={t.placeholder}
                 value={link}
-                onInput={(event) => setLink((event.target as HTMLInputElement).value)}
-                onKeyDown={(event) => {
-                  if (event.key === 'Enter') void loadVideo();
+                disabled={readOnly}
+                onInput={(event) => {
+                  setLink((event.target as HTMLInputElement).value);
+                  setLinkError(null);
+                  setTouched(false);
                 }}
               />
+
               <button
-                type="button"
-                class="rounded-md bg-sky-600 px-3 py-1.5 text-sm font-medium text-white"
-                onClick={loadVideo}
+                type="submit"
+                aria-label={t.watch}
+                disabled={readOnly}
+                class="flex h-8 w-8 shrink-0 items-center justify-center rounded-full bg-neutral-800 text-neutral-300 transition hover:bg-neutral-700 disabled:opacity-30"
               >
-                Load
+                <svg
+                  viewBox="0 0 24 24"
+                  class="h-4 w-4"
+                  fill="none"
+                  stroke="currentColor"
+                  stroke-width="2"
+                  stroke-linecap="round"
+                  stroke-linejoin="round"
+                  aria-hidden="true"
+                >
+                  <path d="M5 12h14M13 6l6 6-6 6" />
+                </svg>
               </button>
             </div>
-          )}
 
-          {error ? (
-            <p class="mt-2 rounded bg-red-950 px-2 py-1 text-[11px] text-red-300">{error}</p>
-          ) : null}
-        </div>
-      ) : null}
+            <p class="mt-3 h-4 text-center text-[11px]">
+              {shownError ? (
+                <span class="text-red-400">{shownError}</span>
+              ) : detected ? (
+                <span class="text-neutral-500">
+                  {t.detected(platformName(detected, t))}
+                </span>
+              ) : (
+                <span class="text-neutral-600">
+                  {readOnly ? t.readOnlyHint : t.hint}
+                </span>
+              )}
+            </p>
+          </form>
 
-      {hasVideo ? (
-        <>
-          {/* Thumbnail while the API is still coming up: a black box looks like a bug. */}
-          {!playerReady ? (
-            <div class="pointer-events-none absolute inset-0">
-              <img
-                class="h-full w-full object-cover opacity-60"
-                src={`https://i.ytimg.com/vi/${snapshot?.videoId}/hqdefault.jpg`}
-                alt=""
-              />
-            </div>
-          ) : null}
-
-          {!readOnly && autoplayBlocked ? (
+          {/* The room keeps playing while this client picks another link: the
+              way back must not be a reload of the activity. */}
+          {snapshot ? (
             <button
               type="button"
-              class="absolute inset-0 z-10 flex items-center justify-center bg-black/50 text-sm font-medium"
-              onClick={toggle}
+              class="mx-auto mt-4 block text-[11px] text-neutral-500 underline-offset-2 transition hover:text-neutral-200 hover:underline"
+              onClick={() => {
+                setEmbedError(null);
+                setLinkError(null);
+                setScreen('video');
+              }}
             >
-              Tap to sync playback
+              {t.backToVideo}
             </button>
           ) : null}
+        </div>
+      </main>
+    );
+  }
 
-          <div class="relative z-20 mt-auto bg-gradient-to-t from-black/90 to-transparent p-2">
-            <div class="flex items-center gap-2">
-              {!readOnly ? (
+  const source = snapshot.source;
+
+  return (
+    <main class="relative h-full overflow-hidden bg-black text-neutral-100">
+      <div class="relative h-full">
+        {source.kind === 'file' ? (
+          <div class="grid h-full place-items-center px-6 text-center">
+            {embedError ? (
+              <div class="max-w-xs">
+                <p class="text-[11px] text-red-300">{embedError}</p>
+                <p class="mt-1 text-[11px] text-neutral-500">{t.fileNeedsApp}</p>
                 <button
                   type="button"
-                  class="flex h-8 w-8 items-center justify-center rounded-full bg-white/15 text-xs"
-                  onClick={toggle}
-                  title={snapshot?.playing ? 'Pause' : 'Play'}
+                  class="mt-3 rounded-md bg-neutral-800 px-3 py-1.5 text-[11px] text-neutral-200"
+                  onClick={backToInput}
                 >
-                  {snapshot?.playing ? '❙❙' : '▶'}
-                </button>
-              ) : null}
-
-              <span class="w-10 text-right text-[11px] tabular-nums text-neutral-300">
-                {formatTime(position)}
-              </span>
-
-              <input
-                type="range"
-                class="h-1 min-w-0 flex-1 accent-sky-500"
-                min={0}
-                max={Math.max(1, Math.floor(positionAt(snapshot, serverNow())) + 1)}
-                step={1}
-                value={Math.floor(position)}
-                disabled={readOnly}
-                onInput={(event) => setSeeking(Number((event.target as HTMLInputElement).value))}
-                onChange={(event) => commitSeek(Number((event.target as HTMLInputElement).value))}
-              />
-
-              {!readOnly ? (
-                <button
-                  type="button"
-                  class="rounded bg-white/10 px-2 py-1 text-[11px]"
-                  onClick={() => setEditing((value) => !value)}
-                  title="Change video"
-                >
-                  {editing ? 'Close' : 'Link'}
-                </button>
-              ) : null}
-            </div>
-
-            {editing && !readOnly ? (
-              <div class="mt-2 flex gap-2">
-                <input
-                  class="min-w-0 flex-1 rounded-md border border-neutral-700 bg-black/60 px-2 py-1.5 text-xs outline-none focus:border-sky-500"
-                  placeholder="Another YouTube link"
-                  value={link}
-                  onInput={(event) => setLink((event.target as HTMLInputElement).value)}
-                  onKeyDown={(event) => {
-                    if (event.key === 'Enter') void loadVideo();
-                  }}
-                />
-                <button
-                  type="button"
-                  class="rounded-md bg-sky-600 px-3 py-1.5 text-xs font-medium text-white"
-                  onClick={loadVideo}
-                >
-                  Load
+                  {t.chooseAnother}
                 </button>
               </div>
-            ) : null}
-
-            {error || playerFailed ? (
-              <p class="mt-1 truncate text-[11px] text-red-300">
-                {error ?? 'The player is not available on this device.'}
-              </p>
-            ) : null}
+            ) : (
+              <p class="text-[11px] text-neutral-500">{t.playingInApp}</p>
+            )}
           </div>
-        </>
-      ) : null}
+        ) : (
+          <>
+            <div
+              ref={hostRef}
+              class="absolute inset-0 [&>div]:h-full [&>div]:w-full [&_iframe]:h-full [&_iframe]:w-full"
+            />
+
+            {embedError ? (
+              <div class="absolute inset-0 grid place-items-center bg-black px-5 text-center">
+                <p class="text-[11px] text-red-300">{embedError}</p>
+              </div>
+            ) : !ready ? (
+              <div class="pointer-events-none absolute inset-0 grid place-items-center bg-black">
+                <p class="text-[11px] text-neutral-500">{t.loading}</p>
+              </div>
+            ) : null}
+          </>
+        )}
+      </div>
+
+      {/* A bar over the video was too much: one translucent button, out of the
+          way until the pointer is on it. Escape does the same thing. */}
+      <button
+        type="button"
+        aria-label={t.changeVideo}
+        title={t.changeVideoHint}
+        class="absolute left-2 top-2 z-10 grid h-7 w-7 place-items-center rounded-full bg-black/50 text-white/60 opacity-50 backdrop-blur-sm transition hover:bg-black/75 hover:text-white hover:opacity-100 focus-visible:opacity-100"
+        onClick={backToInput}
+      >
+        <svg
+          viewBox="0 0 24 24"
+          class="h-3.5 w-3.5"
+          fill="none"
+          stroke="currentColor"
+          stroke-width="2"
+          stroke-linecap="round"
+          stroke-linejoin="round"
+          aria-hidden="true"
+        >
+          <path d="M4 8h10a4 4 0 0 1 0 8H9" />
+          <path d="M7 5 4 8l3 3" />
+          <path d="M12 13l-3 3 3 3" />
+        </svg>
+      </button>
     </main>
   );
+}
+
+function platformName(source: Source, t: Messages): string {
+  switch (source.kind) {
+    case 'youtube':
+      return t.platformYoutube;
+    case 'twitch':
+      return source.live ? t.platformTwitchLive : t.platformTwitchVideo;
+    case 'file':
+      return t.platformFile;
+  }
+}
+
+function reasonMessage(reason: DetectionReason, t: Messages): string {
+  if (reason === 'empty') return t.errorEmpty;
+  if (reason === 'insecure') return t.errorInsecure;
+  return t.errorInvalid;
+}
+
+function describe(cause: unknown, t: Messages): string {
+  if (cause instanceof EmbedError) {
+    return t.embedError(cause.embedCode, cause.detail);
+  }
+
+  if (cause && typeof cause === 'object' && 'message' in cause) {
+    return String((cause as { message: unknown }).message);
+  }
+
+  return String(cause);
 }

@@ -1,14 +1,18 @@
 {
   "id": "watch-together",
   "name": "Watch Together",
-  "description": "Watch a YouTube video together, in sync, from inside the voice room.",
-  "version": "0.1.0",
-  "capabilities": [],
+  "description": "Watch YouTube, Twitch or a video file together, in sync, from inside the voice room.",
+  "version": "0.2.0",
   "author": "Novyse",
+  "capabilities": ["network"],
+  "locales": ["en", "it"],
   "permissions": {
+    "channels": ["state"],
     "frame": [
       "https://www.youtube.com",
-      "https://www.youtube-nocookie.com"
+      "https://www.youtube-nocookie.com",
+      "https://player.twitch.tv",
+      "https://www.twitch.tv"
     ]
   }
 }
