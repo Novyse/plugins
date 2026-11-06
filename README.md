@@ -107,6 +107,28 @@ Keep the lists honest: `scripts/validate-registry.mjs` checks that they are
 well formed and that `registry.json` mirrors them, but only the code review can
 see whether a plugin writes on a channel it did not declare.
 
+## Assets inside the single file
+
+A dependency that loads something at runtime — fonts, workers, language files —
+cannot do it from a plugin bundle: `dist/index.html` is fetched as one file and
+mounted in a sandbox, so a relative URL has nothing to resolve against and an
+absolute one is a request the plugin never declared. Freeze them in at build
+time: `assetsInlineLimit` covers images and CSS, and anything the dependency
+fetches itself needs the bytes in the bundle plus a small shim that answers its
+loader. [`plugins/excalidraw`](plugins/excalidraw/DEVELOPING.md) does exactly
+that for the font subsets of Excalidraw, and drops the ones it does not ship
+instead of letting the library fall back to a CDN.
+
+Either way, check the result before publishing:
+
+```sh
+grep -o 'https://[a-z0-9.-]*' plugins/<slug>/dist/index.html | sort -u
+```
+
+should list only namespaces, documentation links and origins that are never
+opened at runtime. Watch the size too: the file is committed, zipped without
+compression and downloaded on every install, so a few megabytes is the ceiling.
+
 ## Store assets
 
 | File | Size | Used as |

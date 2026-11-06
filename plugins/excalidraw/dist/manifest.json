@@ -1,0 +1,23 @@
+{
+  "schemaVersion": 1,
+  "id": "excalidraw",
+  "name": "Excalidraw",
+  "description": "A shared Excalidraw whiteboard, one per voice room: everyone draws on the same board, every stroke in sync.",
+  "version": "0.1.0",
+  "entry": "index.html",
+  "capabilities": [
+    "stream"
+  ],
+  "locales": [
+    "en",
+    "it"
+  ],
+  "author": "Novyse",
+  "permissions": {
+    "channels": [
+      "state",
+      "action",
+      "stream"
+    ]
+  }
+}

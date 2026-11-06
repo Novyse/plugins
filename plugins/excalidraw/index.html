@@ -1,0 +1,18 @@
+<!doctype html>
+<html lang="en">
+  <head>
+    <meta charset="UTF-8" />
+    <meta name="viewport" content="width=device-width, initial-scale=1.0, viewport-fit=cover" />
+    <title>Excalidraw</title>
+    <script>
+      // Excalidraw resolves its font subsets against this base and, failing
+      // that, against esm.sh. The bundle carries the fonts itself and rewrites
+      // every one of those URLs (src/assets.ts), so nothing leaves the sandbox.
+      window.EXCALIDRAW_ASSET_PATH = '/';
+    </script>
+  </head>
+  <body>
+    <div id="root"></div>
+    <script type="module" src="/src/main.tsx"></script>
+  </body>
+</html>
