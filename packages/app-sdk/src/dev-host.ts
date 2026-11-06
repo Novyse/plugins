@@ -33,6 +33,11 @@ export interface DevHostOptions {
   self?: Uuid;
   /** The other participants, simulated. */
   participants?: Uuid[];
+  /**
+   * Language of the fake host, a BCP-47 tag. Defaults to `?lang=` of the page
+   * and then to the language of the browser.
+   */
+  locale?: string;
 }
 
 type Message =
@@ -142,6 +147,7 @@ export function installDevHost(options: DevHostOptions): void {
             serverNow: Date.now(),
             readOnly: false,
             capabilities: ['stream', 'fullscreen', 'network'],
+            locale: options.locale ?? devLocale(),
             state: {
               seq: events.reduce((max, event) => Math.max(max, event.seq), 0),
               truncated: false,
@@ -242,6 +248,22 @@ export function installDevHost(options: DevHostOptions): void {
       },
     },
 
+    player: {
+      async open() {
+        // A browser tab has no native backend: the real host plays the file
+        // with media_kit, the harness cannot. Failing loudly is better than a
+        // fake player that behaves differently from the app.
+        throw Object.assign(
+          new Error('The native player runs inside the Novyse app only'),
+          { code: 'E_UNSUPPORTED' as const },
+        );
+      },
+      async close() {},
+      onClosed() {
+        return () => {};
+      },
+    },
+
     storage: {
       async get(key) {
         const raw = localStorage.getItem(storagePrefix + key);
@@ -266,4 +288,12 @@ export function installDevHost(options: DevHostOptions): void {
 
 function randomSuffix(): string {
   return Math.random().toString(36).slice(2, 6);
+}
+
+/** `?lang=it-IT` wins, then the browser, then English. */
+function devLocale(): string {
+  const fromQuery = new URLSearchParams(window.location.search).get('lang');
+  if (fromQuery) return fromQuery;
+
+  return navigator.language || 'en';
 }
