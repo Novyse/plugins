@@ -238,6 +238,14 @@ export interface Folder {
   appState(): BoardAppState;
   /** Records a local write, so it is not published again on the next diff. */
   setState(patch: Partial<BoardAppState>): void;
+  /**
+   * Records elements the local user wrote, before the echo comes back.
+   *
+   * A published element is part of the board: keeping it out of the folder
+   * until the log echoes it leaves a window where a redraw drops it from the
+   * scene, and the next diff turns that loss into a delete for everyone.
+   */
+  setElements(elements: BoardElement[]): void;
   /** Number of complete `COMPACT` events seen. */
   compacts(): number;
 }
@@ -329,6 +337,10 @@ export function createFolder(): Folder {
 
     setState(patch) {
       appState = mergeAppState(appState, patch);
+    },
+
+    setElements(written) {
+      for (const element of written) elements.set(element.id, element);
     },
 
     compacts() {
