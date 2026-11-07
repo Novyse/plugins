@@ -54,7 +54,7 @@ export interface Embed {
   seek(position: number): void;
   /**
    * Brings the player back to where the room says it is, when it drifted.
-   *
+   */
   align(expected: number): void;
   state(): { playing: boolean; position: number };
   /** Detects a seek the player made on its own (the APIs have no seek event). */
