@@ -130,7 +130,10 @@ export function App() {
     if (!api || !board) return;
 
     const scene = api.getSceneElements();
-    const localOnly = scene.filter((element) => !board.has(element.id));
+    // Membership in the board, not in the baseline: an element that was
+    // published but not echoed yet is already part of the room.
+    const known = new Set(board.elements().map((element) => element.id));
+    const localOnly = scene.filter((element) => !known.has(element.id));
 
     api.updateScene({ elements: [...board.elements(), ...localOnly] });
 
@@ -322,8 +325,14 @@ export function App() {
 
     const change = board.apply(event);
 
-    if (change?.kind === 'appstate') applyAppStateRef.current();
-    else if (change || event.type === COMPACT) scheduleRender();
+    if (change?.kind === 'appstate') {
+      applyAppStateRef.current();
+    } else {
+      // A snapshot carries the page too: after a reset the theme and the grid
+      // of the room must be applied to the canvas, not only its elements.
+      if (change?.kind === 'reset' && change.appState) applyAppStateRef.current();
+      if (change || event.type === COMPACT) scheduleRender();
+    }
 
     sinceCompactRef.current += 1;
     maybeCompactRef.current();
@@ -435,7 +444,7 @@ export function App() {
     <main className="board">
       <div ref={canvasRef} className="board__canvas">
         <Excalidraw
-          theme="light"
+          theme={init.theme === 'dark' ? 'dark' : 'light'}
           langCode={locale === 'it' ? 'it-IT' : 'en'}
           viewModeEnabled={passive}
           excalidrawAPI={(api) => {

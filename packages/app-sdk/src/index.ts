@@ -63,6 +63,10 @@ export interface InitPayload {
    * may still send one it does not have.
    */
   locale: string;
+  /**
+   * The theme the host is drawn in.
+   */
+  theme?: 'light' | 'dark';
   state: {
     /** Last sequence number assigned to the activity. */
     seq: number;

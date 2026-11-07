@@ -121,8 +121,16 @@ export class Board {
     return Object.keys(patch).length > 0 ? patch : null;
   }
 
-  /** The write left: its elements are part of what the room knows now. */
+  /**
+   * The write left: its elements are part of the board, not just of the
+   * baseline.
+   *
+   * Adding them to the folder too closes the gap between the publication and
+   * the echo: a redraw in that gap used to drop an element that `sigs` already
+   * considered known, and the following diff published the deletion.
+   */
   markSent(elements: BoardElement[]): void {
+    this.folder.setElements(elements);
     for (const element of elements) this.remember(element);
   }
 
