@@ -35,6 +35,26 @@
       "type": "string",
       "pattern": "^(0|[1-9][0-9]*)\\.(0|[1-9][0-9]*)\\.(0|[1-9][0-9]*)$"
     },
+    "author": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": ["name"],
+      "description": "Who published the plugin. The URL is optional: the store makes the name clickable only when it is present.",
+      "properties": {
+        "name": {
+          "type": "string",
+          "minLength": 1,
+          "maxLength": 120
+        },
+        "url": {
+          "type": "string",
+          "format": "uri",
+          "pattern": "^https://",
+          "maxLength": 300,
+          "description": "Page of the author, https only, e.g. their GitHub profile."
+        }
+      }
+    },
     "plugin": {
       "type": "object",
       "additionalProperties": false,
@@ -62,8 +82,7 @@
           "maxLength": 64
         },
         "author": {
-          "type": "string",
-          "maxLength": 120
+          "$ref": "#/$defs/author"
         },
         "description": {
           "type": "string",
