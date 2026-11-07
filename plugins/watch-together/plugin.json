@@ -2,7 +2,7 @@
   "id": "watch-together",
   "name": "Watch Together",
   "description": "Watch YouTube, Twitch or a video file together, in sync, from inside the voice room.",
-  "version": "0.2.0",
+  "version": "0.2.1",
   "author": {
     "name": "Novyse",
     "url": "https://github.com/Novyse"
