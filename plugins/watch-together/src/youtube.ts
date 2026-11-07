@@ -7,9 +7,10 @@
  * - the document origin is `http://127.0.0.1:<port>` on native and opaque on
  *   the web, so the API can refuse to answer. `createYouTube` fails (timeout or
  *   script error) and the UI says so instead of showing a black box;
- * - a browser may refuse `playVideo()` without a user gesture. Nothing is
- *   forced: the room keeps playing and the local user taps play on the player
- *   itself, whose event is then published like any other intent.
+ * - a browser refuses a `playVideo()` that no gesture asked for, and that is
+ *   exactly the call a receiver makes. Nothing is forced: the room keeps
+ *   playing, the local player stays where it is, and one tap on it starts that
+ *   client.
  *
  * The video is passed when the player is created, not loaded afterwards: the
  * API then builds `/embed/<id>?...`, which is the path it has been tested on
@@ -17,11 +18,11 @@
  * does not always buffer: the tile shows the poster and never starts.
  */
 import {
-  API_TIMEOUT_MS,
   APPLY_HOLD_MS,
   EmbedError,
   INTENT_HOLD_MS,
   SEEK_INTENT,
+  SEEK_TOLERANCE,
   type Embed,
   type EmbedCallbacks,
 } from './embed';
@@ -68,7 +69,14 @@ const STOPPED_STATES = new Set([0, 2]);
 
 let api: Promise<YouTubeApi> | null = null;
 
-/** Loads the IFrame API once, and keeps the promise for the next player. */
+/**
+ * Loads the IFrame API once, and keeps the promise for the next player.
+ *
+ * There is no deadline of our own: a script that cannot be fetched fires
+ * `onerror`, and one that is fetched either defines `YT.Player` or calls the
+ * global callback. Waiting for one of those two is exact — a guessed duration
+ * only turned a slow network into an error the user could not act on.
+ */
 function loadApi(): Promise<YouTubeApi> {
   if (api) return api;
 
@@ -78,13 +86,9 @@ function loadApi(): Promise<YouTubeApi> {
       return;
     }
 
-    const timer = window.setTimeout(() => {
-      reject(new EmbedError('youtube-no-answer'));
-    }, API_TIMEOUT_MS);
-
+    // Assigned before the script is appended, so the API cannot call it before
+    // this page is listening.
     window.onYouTubeIframeAPIReady = () => {
-      window.clearTimeout(timer);
-
       if (window.YT?.Player) resolve(window.YT);
       else reject(new EmbedError('youtube-not-available'));
     };
@@ -92,12 +96,18 @@ function loadApi(): Promise<YouTubeApi> {
     const script = document.createElement('script');
     script.src = 'https://www.youtube.com/iframe_api';
     script.async = true;
-    script.onerror = () => {
-      window.clearTimeout(timer);
-      reject(new EmbedError('youtube-fetch-failed'));
-    };
+
+    // A blocked or unreachable script (offline, policy, DNS) says so here; one
+    // that arrives is followed by the callback above.
+    script.onerror = () => reject(new EmbedError('youtube-fetch-failed'));
 
     document.head.appendChild(script);
+  }).catch((cause: unknown) => {
+    // A failed load must not poison the next attempt: the next player retries
+    // the script instead of inheriting this rejection.
+    api = null;
+
+    throw cause;
   });
 
   return api;
@@ -276,6 +286,18 @@ class YouTubeEmbed implements Embed {
     this.callbacks.onIntent(playing, position);
   }
 
+  align(expected: number): void {
+    if (!this.loaded || this.live()) return;
+    if (Date.now() - this.intentAt < INTENT_HOLD_MS) return;
+
+    // A buffering player is already on its way somewhere: seeking it now would
+    // throw away the buffer it is filling.
+    if (this.playerState() === BUFFERING) return;
+    if (Math.abs(this.position() - expected) <= SEEK_TOLERANCE) return;
+
+    this.seekTo(expected);
+  }
+
   destroy(): void {
     try {
       this.player.destroy();
@@ -285,7 +307,12 @@ class YouTubeEmbed implements Embed {
   }
 }
 
-/** Creates the player inside `host`, failing when the API cannot be used. */
+/**
+ * Creates the player inside `host`, failing when the API cannot be used.
+ *
+ * The API is awaited directly: the load reports its own failure, so there is no
+ * promise of ours to give up on.
+ */
 export function createYouTube(
   host: HTMLElement,
   source: YoutubeSource,
@@ -340,10 +367,6 @@ export function createYouTube(
           return;
         }
 
-        window.setTimeout(() => {
-          if (embed) return;
-          reject(new EmbedError('youtube-no-answer'));
-        }, API_TIMEOUT_MS);
       }),
   );
 }

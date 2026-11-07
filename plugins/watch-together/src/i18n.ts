@@ -45,21 +45,17 @@ export interface Messages {
 }
 
 const EN_ERRORS: Record<Exclude<EmbedErrorCode, 'youtube-refused'>, string> = {
-  'youtube-no-answer': 'The YouTube player did not answer',
   'youtube-not-available': 'The YouTube player is not available',
   'youtube-fetch-failed': 'The YouTube player could not be fetched',
   'twitch-no-domain': 'Twitch cannot be embedded here: no domain to declare',
-  'twitch-no-answer': 'The Twitch player did not answer',
   'twitch-not-available': 'The Twitch player is not available',
   'twitch-fetch-failed': 'The Twitch player could not be fetched',
 };
 
 const IT_ERRORS: Record<Exclude<EmbedErrorCode, 'youtube-refused'>, string> = {
-  'youtube-no-answer': 'Il player di YouTube non ha risposto',
   'youtube-not-available': 'Il player di YouTube non è disponibile',
   'youtube-fetch-failed': 'Impossibile caricare il player di YouTube',
   'twitch-no-domain': 'Twitch non può essere incorporato qui: nessun dominio da dichiarare',
-  'twitch-no-answer': 'Il player di Twitch non ha risposto',
   'twitch-not-available': 'Il player di Twitch non è disponibile',
   'twitch-fetch-failed': 'Impossibile caricare il player di Twitch',
 };

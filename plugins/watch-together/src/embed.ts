@@ -5,12 +5,10 @@
  * the room decides how to say it.
  */
 export type EmbedErrorCode =
-  | 'youtube-no-answer'
   | 'youtube-not-available'
   | 'youtube-fetch-failed'
   | 'youtube-refused'
   | 'twitch-no-domain'
-  | 'twitch-no-answer'
   | 'twitch-not-available'
   | 'twitch-fetch-failed';
 
@@ -46,13 +44,18 @@ export interface Embed {
   /** Loads the source at a position; `playing` is the intent of the room. */
   load(position: number, playing: boolean): void;
   /**
-   * Aligns play and pause with the room. Positions are not applied here: a
-   * player that is buffering must be left alone, and a drift computed every
-   * tick would seek it again and again.
+   * Aligns play and pause with the room.
+   *
+   * Play and pause are commands: repeating them is harmless, so they can be
+   * applied on every tick. A seek is not, and lives in `align`.
    */
   apply(playing: boolean): void;
   /** Jumps to a position, once, when the room actually asks for it. */
   seek(position: number): void;
+  /**
+   * Brings the player back to where the room says it is, when it drifted.
+   *
+  align(expected: number): void;
   state(): { playing: boolean; position: number };
   /** Detects a seek the player made on its own (the APIs have no seek event). */
   tick(): void;
@@ -68,5 +71,8 @@ export const APPLY_HOLD_MS = 1200;
 /** How long a play/pause the user asked for is left alone, in ms. */
 export const INTENT_HOLD_MS = 2500;
 
-/** Shared by both embeds: the script load gives up after this. */
-export const API_TIMEOUT_MS = 8000;
+/**
+ * How far the local player may be from the room before `align` seeks it, in
+ * seconds.
+ */
+export const SEEK_TOLERANCE = 1.5;
