@@ -1,21 +1,24 @@
 import type { AppSDK, Uuid } from '@novyse/app-sdk';
 
+import { isBoardElement, type BoardElement } from './protocol';
+
 /**
- * The live layer: ghost strokes over `STREAM`, cursors, and the "stroke is over"
- * signal over `ACTION`.
+ * The live layer: the elements the room is drawing right now, and the cursors.
  *
- * Nothing here is replayed to a late joiner, because nothing here is a fact: it
- * is an impression of a hand that is still moving. The stroke becomes real only
- * when it lands in the `STATE` log, and the preview is dropped at that moment.
+ * Nothing here is a fact: a preview is an impression of a hand that is still
+ * moving, it is never replayed to a late joiner, and it is dropped the moment
+ * the element lands in the `STATE` log.
  *
- * The packets are tiny JSON objects, deliberately not thrifty with bytes: a
- * stroke at 30 Hz with ~60 points per packet is under 2 KiB, well below the 8 KiB
- * of the channel, and a decoder that can be read by a human is worth more than
- * saving half of a packet.
+ * Previews carry the *real* Excalidraw element rather than a redrawing of it.
+ * A stroke drawn again in SVG cannot have the style, the width or the roughness
+ * of the one under the sender's mouse, and it cannot show a text being typed or
+ * an image being resized at all: the receiver puts the element it is given on
+ * its canvas, so it sees exactly what the sender sees, for every element type,
+ * with no second renderer to keep in sync.
  */
 
-/** Reliable "this stroke is over", sent on the ACTION channel. */
-export const STROKE_END = 'STROKE_END';
+/** Reliable "the gesture is over": the element is about to be in the log. */
+export const PREVIEW_END = 'PREVIEW_END';
 
 const PALETTE = [
   '#e03131',
@@ -30,15 +33,17 @@ const PALETTE = [
 
 const CURSOR_INTERVAL_MS = 60;
 const CURSOR_MIN_DISTANCE = 3;
-/** 30 Hz: the preview is fluid without flooding the channel. */
-const STROKE_INTERVAL_MS = 33;
 const CURSOR_TTL_MS = 8_000;
-const GHOST_TTL_MS = 20_000;
-/** Points per packet: ~1.5 KiB, safely inside the 8 KiB of `stream`. */
-const POINTS_PER_PACKET = 64;
-
-const BOX_TOOLS = new Set(['rectangle', 'ellipse', 'diamond', 'frame']);
-const PATH_TOOLS = new Set(['freedraw', 'line', 'arrow']);
+/** A preview that stops arriving belongs to a gesture that stopped. */
+const PREVIEW_TTL_MS = 4_000;
+/**
+ * Characters of the element per packet.
+ *
+ * A `stream` packet is 8 KiB and the payload is JSON, so the budget stays
+ * well below it: a freedraw stroke of a few hundred points is several packets,
+ * and a lost one is simply replaced by the next preview of the same element.
+ */
+const PREVIEW_CHUNK_CHARS = 3_000;
 
 const SVG_NS = 'http://www.w3.org/2000/svg';
 
@@ -48,40 +53,18 @@ export interface Viewport {
   zoom: number;
 }
 
-export interface LocalStyle {
-  strokeColor: string;
-  strokeWidth: number;
-  opacity: number;
-}
-
 type Point = [number, number];
 
 type Packet =
+  | { k: 'p'; x: number; y: number }
   | {
-      k: 's';
+      k: 'v';
       id: string;
-      tool: string;
-      kind: 'path' | 'box';
-      c: string;
-      w: number;
-      o: number;
-      p: Point[];
-    }
-  | { k: 'e'; id: string }
-  | { k: 'p'; x: number; y: number };
-
-interface Ghost {
-  sender: Uuid;
-  id: string;
-  kind: 'path' | 'box';
-  tool: string;
-  color: string;
-  width: number;
-  opacity: number;
-  points: Point[];
-  start: Point;
-  touchedAt: number;
-}
+      seq: number;
+      chunk: number;
+      total: number;
+      data: string;
+    };
 
 interface Cursor {
   x: number;
@@ -89,16 +72,11 @@ interface Cursor {
   touchedAt: number;
 }
 
-interface Stroke {
-  id: string;
-  kind: 'path' | 'box';
-  tool: string;
-  color: string;
-  width: number;
-  opacity: number;
-  points: Point[];
-  sent: number;
-  lastSentAt: number;
+interface Incoming {
+  seq: number;
+  total: number;
+  parts: Map<number, string>;
+  touchedAt: number;
 }
 
 export interface PresenceOptions {
@@ -106,33 +84,31 @@ export interface PresenceOptions {
   container: HTMLElement;
   sdk: AppSDK;
   self: Uuid;
-  /** The tool Excalidraw has selected right now. */
-  getActiveTool: () => string;
-  /** The local stroke ended: an element is about to be committed. */
-  onCommit: () => void;
-  /**
-   * The color, width and opacity the user has selected right now.
-   */
-  getStyle?: () => LocalStyle;
+  /** An element of the room is being drawn: put it on the canvas. */
+  onPreview(element: BoardElement): void;
+  /** The gesture is over: what the log says is the truth from now on. */
+  onPreviewEnd(id: string): void;
 }
 
 export class Presence {
   private readonly options: PresenceOptions;
-  private readonly ghosts = new Map<string, Ghost>();
   private readonly cursors = new Map<string, Cursor>();
   private readonly names = new Map<string, string>();
   private readonly requested = new Set<string>();
+  /** Buffers of the previews still arriving, by `<sender>:<element>`. */
+  private readonly incoming = new Map<string, Incoming>();
+  /** Previews handed to the canvas, so a silent sender does not freeze one. */
+  private readonly shown = new Map<string, number>();
   private readonly encoder = new TextEncoder();
   private readonly decoder = new TextDecoder();
 
   private viewport: Viewport = { scrollX: 0, scrollY: 0, zoom: 1 };
-  private style: LocalStyle = { strokeColor: '#1e1e1e', strokeWidth: 2, opacity: 100 };
-  private stroke: Stroke | null = null;
   private lastCursor: { x: number; y: number; at: number } | null = null;
   private svg: SVGSVGElement | null = null;
   private frame = 0;
   private dirty = false;
   private pruneAt = 0;
+  private seq = 0;
   private disposers: Array<() => void> = [];
 
   constructor(options: PresenceOptions) {
@@ -146,38 +122,25 @@ export class Presence {
     this.svg = svg;
 
     const container = this.options.container;
-    const onDown = (event: PointerEvent) => this.pointerDown(event);
     const onMove = (event: PointerEvent) => this.pointerMove(event);
-    const onUp = () => this.pointerUp();
 
-    container.addEventListener('pointerdown', onDown);
-    // Capturing on the container: the point we want is the raw one, whatever
-    // Excalidraw has already done with the element.
     container.addEventListener('pointermove', onMove);
-    window.addEventListener('pointerup', onUp);
-    window.addEventListener('pointercancel', onUp);
 
     this.disposers.push(
-      () => container.removeEventListener('pointerdown', onDown),
       () => container.removeEventListener('pointermove', onMove),
-      () => window.removeEventListener('pointerup', onUp),
-      () => window.removeEventListener('pointercancel', onUp),
-    );
-
-    this.disposers.push(
-      this.options.sdk.stream.on((sender, bytes) => this.receive(sender, bytes)),
-    );
-
-    // `action` is reliable and never replayed: it is the right channel for the
-    // end of a stroke, which a lossy packet cannot guarantee.
-    this.disposers.push(
+      this.options.sdk.stream.on((sender, bytes) =>
+        this.receive(sender, bytes),
+      ),
+      // `action` is reliable and never replayed: the right channel for "this
+      // gesture is over", which a lossy packet cannot guarantee.
       this.options.sdk.action.on((event) => {
-        if (event.type !== STROKE_END) return;
+        if (event.type !== PREVIEW_END) return;
 
         const data = event.data as { id?: unknown } | null;
         if (typeof data?.id !== 'string') return;
 
-        if (this.ghosts.delete(`${event.sender}:${data.id}`)) this.dirty = true;
+        this.options.onPreviewEnd(data.id);
+        this.shown.delete(data.id);
       }),
     );
 
@@ -193,6 +156,8 @@ export class Presence {
 
     this.svg?.remove();
     this.svg = null;
+    this.incoming.clear();
+    this.shown.clear();
   }
 
   setViewport(viewport: Viewport): void {
@@ -200,12 +165,34 @@ export class Presence {
     this.dirty = true;
   }
 
-  setStyle(style: LocalStyle): void {
-    this.style = style;
+  /** Streams one element of the local canvas to the room. */
+  publish(element: BoardElement): void {
+    const json = JSON.stringify(element);
+    const seq = (this.seq += 1);
+    const total = Math.max(1, Math.ceil(json.length / PREVIEW_CHUNK_CHARS));
+
+    for (let chunk = 0; chunk < total; chunk += 1) {
+      this.send({
+        k: 'v',
+        id: element.id,
+        seq,
+        chunk,
+        total,
+        data: json.slice(
+          chunk * PREVIEW_CHUNK_CHARS,
+          (chunk + 1) * PREVIEW_CHUNK_CHARS,
+        ),
+      });
+    }
   }
 
-  isDrawing(): boolean {
-    return this.stroke !== null;
+  /** The gesture is over: the log is about to carry these elements. */
+  end(ids: Iterable<string>): void {
+    for (const id of ids) {
+      void this.options.sdk.action
+        .send(PREVIEW_END, { id })
+        .catch(() => undefined);
+    }
   }
 
   private loop = (): void => {
@@ -223,92 +210,22 @@ export class Presence {
     this.paint();
   };
 
-  private pointerDown(event: PointerEvent): void {
-    if (event.button !== 0) return;
-    // The toolbar is a button, not a canvas: only a real drawing click starts a
-    // ghost, so pressing "rectangle" does not publish a point.
-    if (!(event.target instanceof HTMLCanvasElement)) return;
-
-    const tool = this.options.getActiveTool();
-    const kind = BOX_TOOLS.has(tool) ? 'box' : PATH_TOOLS.has(tool) ? 'path' : null;
-    if (!kind) return;
-
-    const style = this.options.getStyle?.() ?? this.style;
-    this.style = style;
-
-    this.stroke = {
-      id: crypto.randomUUID(),
-      kind,
-      tool,
-      color: style.strokeColor,
-      width: style.strokeWidth,
-      opacity: Math.min(100, Math.max(0, style.opacity)) / 100,
-      points: [this.toScene(event)],
-      sent: 0,
-      lastSentAt: 0,
-    };
-  }
-
   private pointerMove(event: PointerEvent): void {
     const point = this.toScene(event);
-    const stroke = this.stroke;
-
-    if (stroke) {
-      // A box needs its origin and its tip, not every pixel of the drag.
-      stroke.points =
-        stroke.kind === 'box' ? [stroke.points[0], point] : [...stroke.points, point];
-      this.pump(stroke, performance.now(), false);
-      this.dirty = true;
-      return;
-    }
 
     const now = performance.now();
     if (this.lastCursor) {
       if (now - this.lastCursor.at < CURSOR_INTERVAL_MS) return;
 
-      const moved = Math.hypot(point[0] - this.lastCursor.x, point[1] - this.lastCursor.y);
+      const moved = Math.hypot(
+        point[0] - this.lastCursor.x,
+        point[1] - this.lastCursor.y,
+      );
       if (moved < CURSOR_MIN_DISTANCE) return;
     }
 
     this.lastCursor = { x: point[0], y: point[1], at: now };
     this.send({ k: 'p', x: point[0], y: point[1] });
-  }
-
-  private pointerUp(): void {
-    const stroke = this.stroke;
-    if (!stroke) return;
-
-    this.stroke = null;
-
-    // The tail of the stroke, then the two signals that drop the preview.
-    this.pump(stroke, performance.now(), true);
-    this.send({ k: 'e', id: stroke.id });
-    void this.options.sdk.action.send(STROKE_END, { id: stroke.id }).catch(() => undefined);
-
-    this.dirty = true;
-    this.options.onCommit();
-  }
-
-  private pump(stroke: Stroke, now: number, final: boolean): void {
-    if (stroke.sent >= stroke.points.length) return;
-    if (!final && now - stroke.lastSentAt < STROKE_INTERVAL_MS) return;
-
-    const pending = stroke.points.slice(stroke.sent);
-    stroke.sent = stroke.points.length;
-    stroke.lastSentAt = now;
-
-    for (let index = 0; index < pending.length; index += POINTS_PER_PACKET) {
-      this.send({
-        k: 's',
-        id: stroke.id,
-        tool: stroke.tool,
-        kind: stroke.kind,
-        c: stroke.color,
-        w: stroke.width,
-        o: stroke.opacity,
-        p: pending.slice(index, index + POINTS_PER_PACKET),
-      });
-    }
   }
 
   private receive(sender: Uuid, bytes: Uint8Array): void {
@@ -327,49 +244,63 @@ export class Presence {
     }
 
     const key = `${sender}:${packet.id}`;
+    let entry = this.incoming.get(key);
 
-    if (packet.k === 'e') {
-      if (this.ghosts.delete(key)) this.dirty = true;
+    // A newer preview of the same element starts over: the older one is a
+    // state of the gesture nobody is in anymore.
+    if (!entry || entry.seq !== packet.seq) {
+      entry = {
+        seq: packet.seq,
+        total: packet.total,
+        parts: new Map<number, string>(),
+        touchedAt: now,
+      };
+      this.incoming.set(key, entry);
+    }
+
+    entry.touchedAt = now;
+    entry.parts.set(packet.chunk, packet.data);
+
+    if (entry.parts.size !== entry.total) return;
+
+    this.incoming.delete(key);
+
+    let decoded: unknown;
+
+    try {
+      decoded = JSON.parse(this.join(entry));
+    } catch {
       return;
     }
 
-    const existing = this.ghosts.get(key);
-    const ghost: Ghost = existing ?? {
-      sender,
-      id: packet.id,
-      kind: packet.kind,
-      tool: packet.tool,
-      color: packet.c,
-      width: packet.w,
-      opacity: packet.o,
-      points: [],
-      start: packet.p[0] ?? [0, 0],
-      touchedAt: now,
-    };
+    if (!isBoardElement(decoded)) return;
 
-    if (existing) {
-      existing.points.push(...packet.p);
-      existing.touchedAt = now;
-    } else {
-      ghost.points.push(...packet.p);
-      this.ghosts.set(key, ghost);
-    }
-
-    const target = existing ?? ghost;
-    if (target.kind === 'box') {
-      target.points = [target.start, packet.p[packet.p.length - 1] ?? target.start];
-    }
-
+    this.shown.set(decoded.id, now);
     this.ensureName(sender);
-    this.dirty = true;
+    this.options.onPreview(decoded);
+  }
+
+  private join(entry: Incoming): string {
+    let encoded = '';
+    for (let index = 0; index < entry.total; index += 1) {
+      encoded += entry.parts.get(index) ?? '';
+    }
+
+    return encoded;
   }
 
   private prune(now: number): void {
     let changed = false;
 
-    for (const [key, ghost] of this.ghosts) {
-      if (now - ghost.touchedAt <= GHOST_TTL_MS) continue;
-      this.ghosts.delete(key);
+    for (const [key, entry] of this.incoming) {
+      if (now - entry.touchedAt <= PREVIEW_TTL_MS) continue;
+      this.incoming.delete(key);
+    }
+
+    for (const [id, touchedAt] of this.shown) {
+      if (now - touchedAt <= PREVIEW_TTL_MS) continue;
+      this.shown.delete(id);
+      this.options.onPreviewEnd(id);
       changed = true;
     }
 
@@ -391,40 +322,6 @@ export class Presence {
     const y = (value: number) => (value + scrollY) * zoom;
 
     const parts: string[] = [];
-
-    for (const ghost of this.ghosts.values()) {
-      const color = ghost.color || this.colorOf(ghost.sender);
-      const width = Math.max(1, ghost.width * zoom);
-
-      if (ghost.kind === 'box') {
-        const [startX, startY] = ghost.start;
-        const [endX, endY] = ghost.points[ghost.points.length - 1] ?? ghost.start;
-        const left = Math.min(startX, endX);
-        const top = Math.min(startY, endY);
-        const boxWidth = Math.abs(endX - startX) * zoom;
-        const boxHeight = Math.abs(endY - startY) * zoom;
-
-        if (ghost.tool === 'ellipse') {
-          parts.push(
-            `<ellipse cx="${x(left) + boxWidth / 2}" cy="${y(top) + boxHeight / 2}" rx="${boxWidth / 2}" ry="${boxHeight / 2}" fill="none" stroke="${color}" stroke-width="${width}" opacity="${ghost.opacity}"/>`,
-          );
-        } else {
-          parts.push(
-            `<rect x="${x(left)}" y="${y(top)}" width="${boxWidth}" height="${boxHeight}" fill="none" stroke="${color}" stroke-width="${width}" opacity="${ghost.opacity}"/>`,
-          );
-        }
-
-        continue;
-      }
-
-      const points = ghost.points
-        .map(([pointX, pointY]) => `${x(pointX).toFixed(1)},${y(pointY).toFixed(1)}`)
-        .join(' ');
-
-      parts.push(
-        `<polyline points="${points}" fill="none" stroke="${color}" stroke-width="${width}" stroke-linecap="round" stroke-linejoin="round" opacity="${ghost.opacity}"/>`,
-      );
-    }
 
     for (const [sender, cursor] of this.cursors) {
       const color = this.colorOf(sender);
@@ -504,39 +401,20 @@ export class Presence {
         : null;
     }
 
-    if (packet.k === 'e') {
-      return typeof packet.id === 'string' ? { k: 'e', id: packet.id } : null;
-    }
-
-    if (packet.k !== 's') return null;
-    if (typeof packet.id !== 'string') return null;
-    if (packet.kind !== 'path' && packet.kind !== 'box') return null;
-    if (typeof packet.tool !== 'string') return null;
-    if (typeof packet.c !== 'string') return null;
-    if (!isFiniteNumber(packet.w) || !isFiniteNumber(packet.o)) return null;
-    if (!Array.isArray(packet.p)) return null;
-
-    const points: Point[] = [];
-    for (const candidate of packet.p) {
-      if (!Array.isArray(candidate) || candidate.length < 2) return null;
-
-      const [pointX, pointY] = candidate;
-      if (!isFiniteNumber(pointX) || !isFiniteNumber(pointY)) return null;
-
-      points.push([pointX, pointY]);
-    }
-
-    if (points.length === 0) return null;
+    if (packet.k !== 'v') return null;
+    if (typeof packet.id !== 'string' || packet.id.length === 0) return null;
+    if (!isFiniteNumber(packet.seq)) return null;
+    if (!isFiniteNumber(packet.chunk) || !isFiniteNumber(packet.total)) return null;
+    if (packet.chunk < 0 || packet.total < 1 || packet.chunk >= packet.total) return null;
+    if (typeof packet.data !== 'string') return null;
 
     return {
-      k: 's',
+      k: 'v',
       id: packet.id,
-      tool: packet.tool,
-      kind: packet.kind,
-      c: packet.c,
-      w: packet.w,
-      o: packet.o,
-      p: points,
+      seq: packet.seq,
+      chunk: packet.chunk,
+      total: packet.total,
+      data: packet.data,
     };
   }
 }
