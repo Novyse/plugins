@@ -2,7 +2,7 @@ import { useEffect, useRef, useState } from 'preact/hooks';
 
 import { getAppSDK, type InitPayload } from '@novyse/app-sdk';
 
-import { EmbedError, SEEK_INTENT, type Embed, type EmbedCallbacks } from './embed';
+import { EmbedError, type Embed, type EmbedCallbacks } from './embed';
 import { messagesFor, normalizeLocale, type Locale, type Messages } from './i18n';
 import {
   PLAYBACK,
@@ -79,6 +79,7 @@ export function App() {
       return true;
     } catch (cause) {
       setLinkError(describe(cause, messagesRef.current));
+
       return false;
     }
   };
@@ -230,24 +231,9 @@ export function App() {
     };
   }, [init !== null, screen, snapshot?.source.url]);
 
-  // A position coming from the room is applied once, when the event arrives;
-  // the player then advances on its own. Recomputing it every tick is what
-  // turns a slow buffer into an endless seek.
-  useEffect(() => {
-    if (!snapshot || screen !== 'video' || snapshot.source.kind === 'file') return;
-
-    const embed = embedRef.current;
-    if (!embed) return;
-
-    const expected = positionAt(snapshot, serverNow());
-    if (Math.abs(embed.state().position - expected) > SEEK_INTENT) {
-      embed.seek(expected);
-    }
-  }, [snapshot?.seq]);
-
-  // Reconciliation: only play and pause are applied all the time; a position
-  // is a one-off event, handled above. `tick` reports a seek made with the
-  // player's own controls.
+  // Reconciliation: play/pause and the position are both applied here, on a
+  // number derived from the snapshot, so keeping two players together costs no
+  // write at all. `tick` reports a seek made with the player's own controls.
   useEffect(() => {
     if (!snapshot || screen !== 'video' || snapshot.source.kind === 'file') return;
 
@@ -257,6 +243,8 @@ export function App() {
       if (!embed || !current) return;
 
       embed.apply(current.playing);
+      embed.align(positionAt(current, serverNow()));
+
       embed.tick();
     }, TICK_MS);
 

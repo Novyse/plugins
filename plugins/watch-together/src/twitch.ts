@@ -18,11 +18,11 @@
  *   VOD (`/videos/<id>`) behaves like a video.
  */
 import {
-  API_TIMEOUT_MS,
   APPLY_HOLD_MS,
   EmbedError,
   INTENT_HOLD_MS,
   SEEK_INTENT,
+  SEEK_TOLERANCE,
   type Embed,
   type EmbedCallbacks,
 } from './embed';
@@ -78,23 +78,20 @@ function loadApi(): Promise<TwitchApi> {
     script.src = SCRIPT_URL;
     script.async = true;
 
-    const timer = window.setTimeout(() => {
-      reject(new EmbedError('twitch-no-answer'));
-    }, API_TIMEOUT_MS);
-
     script.onload = () => {
-      window.clearTimeout(timer);
-
       if (window.Twitch?.Player) resolve(window.Twitch);
       else reject(new EmbedError('twitch-not-available'));
     };
 
-    script.onerror = () => {
-      window.clearTimeout(timer);
-      reject(new EmbedError('twitch-fetch-failed'));
-    };
+    script.onerror = () => reject(new EmbedError('twitch-fetch-failed'));
 
     document.head.appendChild(script);
+  }).catch((cause: unknown) => {
+    // A timeout says this attempt did not work, not that the script is gone:
+    // keeping the rejected promise would make every later player fail at once.
+    api = null;
+
+    throw cause;
   });
 
   return api;
@@ -387,6 +384,15 @@ class TwitchEmbed implements Embed {
     this.callbacks.onIntent(this.playing(), this.position());
   }
 
+  align(expected: number): void {
+    if (!this.loaded || this.source.live) return;
+    if (Date.now() - this.intentAt < INTENT_HOLD_MS) return;
+    if (Date.now() - this.appliedAt < APPLY_HOLD_MS) return;
+    if (Math.abs(this.position() - expected) <= SEEK_TOLERANCE) return;
+
+    this.seekTo(expected);
+  }
+
   destroy(): void {
     // The embed has no teardown: the catcher removes its own element.
     window.clearTimeout(this.unmuteTimer);
@@ -411,6 +417,16 @@ export function createTwitch(
     return Promise.reject(new EmbedError('twitch-no-domain'));
   }
 
+  return createOnce(host, source, callbacks, initialPlaying, parents);
+}
+
+function createOnce(
+  host: HTMLElement,
+  source: TwitchSource,
+  callbacks: EmbedCallbacks,
+  initialPlaying: boolean,
+  parents: string[],
+): Promise<Embed> {
   return loadApi().then(
     (twitch) =>
       new Promise<Embed>((resolve, reject) => {
@@ -419,14 +435,22 @@ export function createTwitch(
         target.style.height = '100%';
         host.appendChild(target);
 
-        const player = new twitch.Player(target.id, {
-          ...(source.channel ? { channel: source.channel } : { video: source.video }),
-          parent: parents,
-          autoplay: initialPlaying,
-          muted: true,
-          width: '100%',
-          height: '100%',
-        });
+        let player: TwitchPlayer;
+
+        try {
+          player = new twitch.Player(target.id, {
+            ...(source.channel ? { channel: source.channel } : { video: source.video }),
+            parent: parents,
+            autoplay: initialPlaying,
+            muted: true,
+            width: '100%',
+            height: '100%',
+          });
+        } catch (cause) {
+          target.remove();
+          reject(cause instanceof Error ? cause : new Error(String(cause)));
+          return;
+        }
 
         const embed = new TwitchEmbed(player, source, callbacks);
 
@@ -441,10 +465,6 @@ export function createTwitch(
           callbacks.onReady();
         });
 
-        window.setTimeout(() => {
-          if (ready) return;
-          reject(new EmbedError('twitch-no-answer'));
-        }, API_TIMEOUT_MS);
       }),
   );
 }
