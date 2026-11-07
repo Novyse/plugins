@@ -5,7 +5,7 @@ import { getAppSDK, type InitPayload, type StateEvent } from '@novyse/app-sdk';
 
 import { Board } from './board';
 import { messagesFor, normalizeLocale, type Locale, type Messages } from './i18n';
-import { Presence, type LocalStyle, type Viewport } from './presence';
+import { Presence, type Viewport } from './presence';
 import { shrinkImage } from './image';
 import {
   APP_STATE,
@@ -28,6 +28,11 @@ import {
 const COMPACT_EVERY = 120;
 /** Debounce of the local diff: a drag is many changes, one write. */
 const FLUSH_MS = 150;
+
+/**
+ * Interval of the live preview.
+ */
+const PREVIEW_MS = 50;
 
 /** Ceiling of one image on the wire, in bytes, once downscaled. */
 const MAX_FILE_BYTES = 300 * 1024;
@@ -54,18 +59,16 @@ interface BoardApi {
 }
 
 interface ContainerState {
-  activeTool?: { type?: string };
   scrollX: number;
   scrollY: number;
   zoom: { value: number };
-  currentItemStrokeColor: string;
-  currentItemStrokeWidth: number;
-  currentItemOpacity: number;
   viewBackgroundColor?: string;
   gridSize?: number | null;
   selectedElementsAreBeingDragged?: boolean;
   newElement?: unknown;
   editingElement?: unknown;
+  resizingElement?: unknown;
+  multiElement?: unknown;
 }
 
 /** The page on screen, as the protocol sees it. */
@@ -99,7 +102,6 @@ export function App() {
   const readOnlyRef = useRef(false);
   const participantsRef = useRef<string[]>([]);
   const viewportRef = useRef<Viewport>({ scrollX: 0, scrollY: 0, zoom: 1 });
-  const styleRef = useRef<LocalStyle>({ strokeColor: '#1e1e1e', strokeWidth: 2, opacity: 100 });
 
   const queuedRef = useRef<StateEvent[]>([]);
   const refusedRef = useRef(new Set<string>());
@@ -133,12 +135,13 @@ export function App() {
   applyAppStateRef.current = applyAppState;
 
   /**
-   * Puts the folded board on the canvas.
+   * Puts the folded board, the live previews and the local gesture on the canvas.
    *
-   * The elements the local user is drawing are not in the board yet, and they
-   * must survive the update: they are kept as they are, appended to the folded
-   * ones, or applying a remote event mid-stroke would delete the line under the
-   * mouse.
+   * A preview overrides the published version of the same element and adds the
+   * ones the board does not have yet; everything else keeps the object it
+   * already has, so a remote update cannot cancel a drag in progress. The
+   * elements only this screen has — the stroke under the mouse — are appended
+   * as they are: replacing them would delete the line being drawn.
    */
   const render = useCallback(() => {
     const api = apiRef.current;
@@ -146,12 +149,28 @@ export function App() {
     if (!api || !board) return;
 
     const scene = api.getSceneElements();
-    // Membership in the board, not in the baseline: an element that was
-    // published but not echoed yet is already part of the room.
-    const known = new Set(board.elements().map((element) => element.id));
-    const localOnly = scene.filter((element) => !known.has(element.id));
+    const previews = board.previewsOf();
+    const elements: BoardElement[] = [];
+    const known = new Set<string>();
 
-    api.updateScene({ elements: [...board.elements(), ...localOnly] });
+    for (const element of board.elements()) {
+      known.add(element.id);
+      elements.push(previews.get(element.id) ?? element);
+    }
+
+    for (const [id, element] of previews) {
+      if (known.has(id)) continue;
+      known.add(id);
+      elements.push(element);
+    }
+
+    for (const element of scene) {
+      if (known.has(element.id)) continue;
+      known.add(element.id);
+      elements.push(element);
+    }
+
+    api.updateScene({ elements });
 
     // Excalidraw may normalize what it was given: refresh the comparison
     // baseline from the scene so the normalization is not mistaken for a local
@@ -170,13 +189,13 @@ export function App() {
    * and the element snaps back to its last published size.
    */
   const interacting = useCallback(() => {
-    if (presenceRef.current?.isDrawing()) return true;
-
     const state = apiRef.current?.getAppState();
-    if (!state) return false;
-
-    return Boolean(
-      state.selectedElementsAreBeingDragged || state.newElement || state.editingElement,
+    if (!state) return false;    return Boolean(
+      state.selectedElementsAreBeingDragged ||
+        state.newElement ||
+        state.editingElement ||
+        state.resizingElement ||
+        state.multiElement,
     );
   }, []);
 
@@ -350,6 +369,12 @@ export function App() {
         await sdk.state.send(APP_STATE, page);
         board.markAppStateSent(page);
       }
+
+      // The room has these elements now: the preview of this gesture is done.
+      presenceRef.current?.end([
+        ...sendable.map((element) => element.id),
+        ...remove,
+      ]);
     } catch (cause) {
       setError(describe(cause, messagesRef.current));
     } finally {
@@ -363,6 +388,42 @@ export function App() {
   }, [sdk]);
 
   flushRef.current = flush;
+
+  /**
+   * Publishes the elements the local hand is still moving.
+   *
+   * Same comparison as [flush] — the scene against what the room knows — but
+   * over `STREAM`, and without marking anything as sent: the log is written
+   * once, when the gesture ends.
+   */
+  const publishPreviews = useCallback(() => {
+    const api = apiRef.current;
+    const board = boardRef.current;
+    const presence = presenceRef.current;
+
+    if (!api || !board || !presence || readOnlyRef.current) return;
+
+    const { upsert } = board.diff(api.getSceneElements());
+    if (upsert.length === 0) return;
+
+    // The bytes before the shape that needs them: a receiver draws the image
+    // the moment the element lands, and an empty rectangle until then.
+    void pushFilesRef.current(false);
+
+    for (const element of upsert) presence.publish(element);
+  }, []);
+
+  const previewTimerRef = useRef(0);
+
+  /** At most one preview per [PREVIEW_MS]. */
+  const schedulePreview = useCallback(() => {
+    if (previewTimerRef.current) return;
+
+    previewTimerRef.current = window.setTimeout(() => {
+      previewTimerRef.current = 0;
+      publishPreviews();
+    }, PREVIEW_MS);
+  }, [publishPreviews]);
 
   const scheduleFlush = useCallback((delay = FLUSH_MS) => {
     if (flushTimerRef.current) window.clearTimeout(flushTimerRef.current);
@@ -430,7 +491,7 @@ export function App() {
 
     const forced = forceCompactRef.current;
     if (!forced && sinceCompactRef.current < COMPACT_EVERY) return;
-    if (compactingRef.current || presenceRef.current?.isDrawing()) return;
+    if (compactingRef.current || interacting()) return;
     if (!canCompactRef.current()) return;
 
     forceCompactRef.current = false;
@@ -481,7 +542,11 @@ export function App() {
       applyAppStateRef.current();
     } else if (change?.kind === 'file') {
       // The bytes are what make the image visible: install them, then redraw.
-      apiRef.current?.addFiles([change.file]);
+      // The copy that comes back to its own author is the re-encoded one that
+      // travelled, and the screen that added the image already has the file.
+      if (event.sender !== initRef.current?.self) {
+        apiRef.current?.addFiles([change.file]);
+      }
       scheduleRender();
     } else {
       // A snapshot carries the page too: after a reset the theme and the grid
@@ -584,24 +649,20 @@ export function App() {
       container,
       sdk,
       self: init.self,
-      getActiveTool: () => apiRef.current?.getAppState().activeTool?.type ?? 'selection',
-      getStyle: () => {
-        const state = apiRef.current?.getAppState();
+      // The preview is the element itself, so the receiver draws it with the
+      // renderer of the sender: same style, same width, same text.
+      onPreview: (element) => {
+        if (!boardRef.current) return;
 
-        return {
-          strokeColor: state?.currentItemStrokeColor ?? styleRef.current.strokeColor,
-          strokeWidth: state?.currentItemStrokeWidth ?? styleRef.current.strokeWidth,
-          opacity: state?.currentItemOpacity ?? styleRef.current.opacity,
-        };
+        boardRef.current.setPreview(element);
+        scheduleRenderRef.current();
       },
-      onCommit: () => {
-        scheduleRender();
-        scheduleFlush(0);
+      onPreviewEnd: (id) => {
+        if (boardRef.current?.clearPreview(id)) scheduleRenderRef.current();
       },
     });
 
     presence.setViewport(viewportRef.current);
-    presence.setStyle(styleRef.current);
     presence.attach();
     presenceRef.current = presence;
 
@@ -609,7 +670,7 @@ export function App() {
       presence.detach();
       presenceRef.current = null;
     };
-  }, [init, sdk, scheduleFlush, scheduleRender]);
+  }, [init, sdk]);
 
   // -------------------------------------------------------------------- view
 
@@ -644,16 +705,12 @@ export function App() {
               zoom: state.zoom.value,
             };
 
-            styleRef.current = {
-              strokeColor: state.currentItemStrokeColor,
-              strokeWidth: state.currentItemStrokeWidth,
-              opacity: state.currentItemOpacity,
-            };
-
             presenceRef.current?.setViewport(viewportRef.current);
-            presenceRef.current?.setStyle(styleRef.current);
 
-            scheduleFlush();
+            // A gesture in progress travels as a preview, so the room sees it
+            // move; the write to the log waits for the hand to stop.
+            if (interacting()) schedulePreview();
+            else scheduleFlush();
           }}
         />
       </div>
