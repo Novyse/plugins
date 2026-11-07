@@ -6,7 +6,10 @@
     {
       "slug": "watch-together",
       "name": "Watch Together",
-      "author": "Novyse",
+      "author": {
+        "name": "Novyse",
+        "url": "https://github.com/Novyse"
+      },
       "description": "Watch YouTube, Twitch or a video file together, in sync, from inside the voice room.",
       "version": "0.2.0",
       "tag": "watch-together@0.2.0",
@@ -38,7 +41,10 @@
     {
       "slug": "excalidraw",
       "name": "Excalidraw",
-      "author": "Novyse",
+      "author": {
+        "name": "Novyse",
+        "url": "https://github.com/Novyse"
+      },
       "description": "A shared Excalidraw whiteboard, one per voice room: everyone draws on the same board, every stroke in sync.",
       "version": "0.1.0",
       "tag": "excalidraw@0.1.0",

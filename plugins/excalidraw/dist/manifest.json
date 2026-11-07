@@ -12,7 +12,10 @@
     "en",
     "it"
   ],
-  "author": "Novyse",
+  "author": {
+    "name": "Novyse",
+    "url": "https://github.com/Novyse"
+  },
   "permissions": {
     "channels": [
       "state",

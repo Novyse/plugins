@@ -37,7 +37,7 @@ const source = JSON.parse(readFileSync(resolve(here, 'plugin.json'), 'utf8')) as
   capabilities?: string[];
   locales?: string[];
   permissions?: { channels?: string[]; frame?: string[] };
-  author?: string;
+  author?: { name: string; url?: string };
 };
 
 /** Writes `dist/manifest.json` from `plugin.json`, so the two cannot diverge. */
