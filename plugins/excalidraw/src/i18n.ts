@@ -17,6 +17,7 @@ export function normalizeLocale(tag: string | null | undefined): Locale {
 }
 
 export interface Messages {
+  imageTooBig: string;
   opening: string;
   readOnly: string;
   ended: string;
@@ -25,6 +26,7 @@ export interface Messages {
 }
 
 const EN: Messages = {
+  imageTooBig: 'That image is too big to share on this board',
   opening: 'Opening the board…',
   readOnly: 'Read only: you can follow the board, not draw on it.',
   ended: 'The activity ended. The board stays as it is.',
@@ -33,6 +35,7 @@ const EN: Messages = {
 };
 
 const IT: Messages = {
+  imageTooBig: 'Questa immagine è troppo grande per essere condivisa su questa lavagna',
   opening: 'Apro la lavagna…',
   readOnly: 'Sola lettura: puoi seguire la lavagna, non disegnarci.',
   ended: 'Attività terminata. La lavagna resta com’è.',

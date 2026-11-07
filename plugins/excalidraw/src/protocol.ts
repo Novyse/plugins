@@ -15,15 +15,21 @@ import type { StateEvent } from '@novyse/app-sdk';
  *               the screen: the background and the grid;
  * - `COMPACT`   a full snapshot, split in chunks, that replaces everything
  *               before it. Without it a trimmed log (`truncated: true`) would
- *               rebuild a mutilated board.
+ *               rebuild a mutilated board;
+ * - `FILE`      the bytes of an image, chunked. An image element only carries a
+ *               `fileId`: without its file the rectangle stays empty.
  */
 
 export const UPSERT = 'UPSERT';
 export const DELETE = 'DELETE';
 export const APP_STATE = 'APP_STATE';
 export const COMPACT = 'COMPACT';
+export const FILE = 'FILE';
 
-export const EVENT_TYPES = [UPSERT, DELETE, APP_STATE, COMPACT] as const;
+/** An action, not a log entry: "send me the board, I joined late". */
+export const SYNC_REQUEST = 'SYNC_REQUEST';
+
+export const EVENT_TYPES = [UPSERT, DELETE, APP_STATE, COMPACT, FILE] as const;
 
 /**
  * The part of an Excalidraw element the protocol relies on.
@@ -71,6 +77,14 @@ export function isBoardElement(value: unknown): value is BoardElement {
 export interface BoardAppState {
   viewBackgroundColor: string;
   gridSize: number | null;
+}
+
+/** One image of the board, as Excalidraw's file store holds it. */
+export interface BoardFile {
+  id: string;
+  mimeType: string;
+  dataURL: string;
+  created: number;
 }
 
 export const DEFAULT_APP_STATE: BoardAppState = {
@@ -171,6 +185,15 @@ export type ParsedEvent =
       total: number;
       elements: BoardElement[];
       appState: Partial<BoardAppState> | null;
+    }
+  | {
+      type: typeof FILE;
+      id: string;
+      mimeType: string;
+      chunk: number;
+      total: number;
+      data: string;
+      created: number;
     };
 
 /** One event from the wire, or `null` if it is not a board event we can trust. */
@@ -193,6 +216,19 @@ export function parseEvent(event: StateEvent): ParsedEvent | null {
   if (event.type === APP_STATE) {
     const appState = parseAppState(data);
     return appState ? { type: APP_STATE, appState } : null;
+  }
+
+  if (event.type === FILE) {
+    const id = typeof data.id === 'string' ? data.id : '';
+    const mimeType = typeof data.mimeType === 'string' ? data.mimeType : '';
+    const chunk = typeof data.chunk === 'number' ? data.chunk : -1;
+    const total = typeof data.total === 'number' ? data.total : 0;
+    const part = typeof data.data === 'string' ? data.data : '';
+    const created = typeof data.created === 'number' ? data.created : 0;
+
+    if (!id || !mimeType || chunk < 0 || total < 1 || chunk >= total) return null;
+
+    return { type: FILE, id, mimeType, chunk, total, data: part, created };
   }
 
   if (event.type === COMPACT) {
@@ -227,7 +263,8 @@ export type Change =
   | { kind: 'upsert'; elements: BoardElement[] }
   | { kind: 'remove'; ids: string[] }
   | { kind: 'reset'; elements: BoardElement[]; appState?: BoardAppState }
-  | { kind: 'appstate'; appState: BoardAppState };
+  | { kind: 'appstate'; appState: BoardAppState }
+  | { kind: 'file'; file: BoardFile };
 
 export interface Folder {
   /** Folds one event. Returns what changed, or `null`. */
@@ -259,6 +296,11 @@ export interface Folder {
 export function createFolder(): Folder {
   const elements = new Map<string, BoardElement>();
   const partial = new Map<string, { total: number; parts: Map<number, BoardElement[]> }>();
+  const files = new Map<string, BoardFile>();
+  const fileParts = new Map<
+    string,
+    { mimeType: string; created: number; total: number; parts: Map<number, string> }
+  >();
   let appState: BoardAppState = { ...DEFAULT_APP_STATE };
   let compactCount = 0;
 
@@ -298,6 +340,42 @@ export function createFolder(): Folder {
       }
 
       if (parsed.type === APP_STATE) return applyAppState(parsed.appState);
+
+      if (parsed.type === FILE) {
+        if (files.has(parsed.id)) return null;
+
+        const entry = fileParts.get(parsed.id) ?? {
+          mimeType: parsed.mimeType,
+          created: parsed.created,
+          total: parsed.total,
+          parts: new Map<number, string>(),
+        };
+
+        if (entry.total !== parsed.total) return null;
+
+        entry.parts.set(parsed.chunk, parsed.data);
+        fileParts.set(parsed.id, entry);
+
+        if (entry.parts.size !== entry.total) return null;
+
+        let encoded = '';
+        for (let index = 0; index < entry.total; index += 1) {
+          encoded += entry.parts.get(index) ?? '';
+        }
+
+        fileParts.delete(parsed.id);
+
+        const file: BoardFile = {
+          id: parsed.id,
+          mimeType: entry.mimeType,
+          dataURL: `data:${entry.mimeType};base64,${encoded}`,
+          created: entry.created,
+        };
+
+        files.set(parsed.id, file);
+
+        return { kind: 'file', file };
+      }
 
       const entry = partial.get(parsed.cid) ?? { total: parsed.total, parts: new Map() };
       if (entry.total !== parsed.total) return null;
