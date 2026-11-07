@@ -22,6 +22,15 @@ const MARKER = '/fonts/';
 /** A valid `FontFace` source, and the closest thing to "the system font". */
 const FALLBACK_SOURCE = 'local("sans-serif")';
 
+/**
+ * A base URL that always parses.
+ */
+const ASSET_BASE = 'https://plugin.novyse.invalid/';
+
+// Excalidraw reads this before it builds any font URL. One value covers the
+// served build and the in-memory one; the hooks below answer the requests.
+(window as unknown as { EXCALIDRAW_ASSET_PATH?: string }).EXCALIDRAW_ASSET_PATH = ASSET_BASE;
+
 const ASSETS: Record<string, string> = FONTS;
 
 /** The inlined bytes of a font URL, or `null` when it is not ours. */
@@ -29,7 +38,7 @@ function inlined(url: string): string | null {
   let pathname: string;
 
   try {
-    pathname = new URL(url, window.location.href).pathname;
+    pathname = new URL(url, ASSET_BASE).pathname;
   } catch {
     return null;
   }

@@ -3,7 +3,7 @@
   "id": "excalidraw",
   "name": "Excalidraw",
   "description": "A shared Excalidraw whiteboard, one per voice room: everyone draws on the same board, every stroke in sync.",
-  "version": "0.1.1",
+  "version": "0.1.2",
   "entry": "index.html",
   "capabilities": [
     "stream"

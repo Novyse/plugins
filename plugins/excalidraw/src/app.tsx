@@ -6,24 +6,34 @@ import { getAppSDK, type InitPayload, type StateEvent } from '@novyse/app-sdk';
 import { Board } from './board';
 import { messagesFor, normalizeLocale, type Locale, type Messages } from './i18n';
 import { Presence, type LocalStyle, type Viewport } from './presence';
+import { shrinkImage } from './image';
 import {
   APP_STATE,
   COMPACT,
   DEFAULT_APP_STATE,
   DELETE,
   EVENT_TYPES,
+  FILE,
+  SYNC_REQUEST,
   UPSERT,
   chunkElements,
   chunkIds,
   createFolder,
   type BoardAppState,
   type BoardElement,
+  type BoardFile,
 } from './protocol';
 
 /** How many events before the owner of the board republishes a snapshot. */
 const COMPACT_EVERY = 120;
 /** Debounce of the local diff: a drag is many changes, one write. */
 const FLUSH_MS = 150;
+
+/** Ceiling of one image on the wire, in bytes, once downscaled. */
+const MAX_FILE_BYTES = 300 * 1024;
+
+/** Base64 characters per `FILE` event: ~6 KiB, well inside one `STATE`. */
+const FILE_CHUNK_CHARS = 8_000;
 
 /**
  * The slice of Excalidraw's imperative API this board uses.
@@ -39,6 +49,8 @@ interface BoardApi {
     elements?: BoardElement[];
     appState?: Partial<BoardAppState>;
   }): void;
+  getFiles(): Record<string, BoardFile>;
+  addFiles(files: BoardFile[]): void;
 }
 
 interface ContainerState {
@@ -51,6 +63,9 @@ interface ContainerState {
   currentItemOpacity: number;
   viewBackgroundColor?: string;
   gridSize?: number | null;
+  selectedElementsAreBeingDragged?: boolean;
+  newElement?: unknown;
+  editingElement?: unknown;
 }
 
 /** The page on screen, as the protocol sees it. */
@@ -95,6 +110,7 @@ export function App() {
   const againRef = useRef(false);
   const flushTimerRef = useRef(0);
   const renderFrameRef = useRef(0);
+  const renderRetryRef = useRef(0);
 
   // ------------------------------------------------------------------ canvas
 
@@ -146,16 +162,49 @@ export function App() {
   const renderRef = useRef(render);
   renderRef.current = render;
 
+  /**
+   * True while the local hand is busy.
+   *
+   * Replacing the elements under a drag or a resize cancels it: Excalidraw
+   * rebuilds the element it was mutating, the handles disappear mid-gesture,
+   * and the element snaps back to its last published size.
+   */
+  const interacting = useCallback(() => {
+    if (presenceRef.current?.isDrawing()) return true;
+
+    const state = apiRef.current?.getAppState();
+    if (!state) return false;
+
+    return Boolean(
+      state.selectedElementsAreBeingDragged || state.newElement || state.editingElement,
+    );
+  }, []);
+
+  const scheduleRenderRef = useRef<() => void>(() => {});
+
   const scheduleRender = useCallback(() => {
-    // A redraw in the middle of a local stroke is what makes it jump.
-    if (presenceRef.current?.isDrawing()) return;
+    // The room's change waits for the hand: a redraw now would cancel the
+    // gesture instead of landing after it.
+    if (interacting()) {
+      if (!renderRetryRef.current) {
+        renderRetryRef.current = window.setTimeout(() => {
+          renderRetryRef.current = 0;
+          scheduleRenderRef.current();
+        }, 200);
+      }
+
+      return;
+    }
+
     if (renderFrameRef.current) return;
 
     renderFrameRef.current = requestAnimationFrame(() => {
       renderFrameRef.current = 0;
       renderRef.current();
     });
-  }, []);
+  }, [interacting]);
+
+  scheduleRenderRef.current = scheduleRender;
 
   // ----------------------------------------------------------------- protocol
 
@@ -164,6 +213,8 @@ export function App() {
   const maybeCompactRef = useRef<() => void>(() => {});
   const flushRef = useRef<() => Promise<void>>(async () => {});
   const handleRef = useRef<(event: StateEvent) => void>(() => {});
+  const answerSyncRef = useRef<() => void>(() => {});
+  const requestSnapshotRef = useRef<() => void>(() => {});
 
   /**
    * Publishes what the local user changed since the last known state.
@@ -173,8 +224,80 @@ export function App() {
    * stroke and a new background all cost a predictable number of events instead
    * of one per element.
    */
+  /**
+   * Publishes the images the room does not have yet.
+   *
+   * An image element only carries a `fileId`; the bytes live in Excalidraw's
+   * file store. Without them a late joiner draws an empty rectangle, so the file
+   * travels too — downscaled and chunked, because one `STATE` event is 16 KiB
+   * and a screenshot is not.
+   */
+  const pushFiles = useCallback(
+    async (all: boolean) => {
+      const api = apiRef.current;
+      const board = boardRef.current;
+      if (!api || !board) return;
+
+      const referenced = new Set<string>();
+
+      for (const element of board.elements()) {
+        if (element.type !== 'image') continue;
+        if (typeof element.fileId === 'string') referenced.add(element.fileId);
+      }
+
+      if (referenced.size === 0) return;
+
+      const files = api.getFiles();
+
+      for (const id of referenced) {
+        if (!all && board.hasFile(id)) continue;
+
+        const file = files[id];
+        if (!file || typeof file.dataURL !== 'string' || file.dataURL.length === 0) continue;
+
+        const prepared = await shrinkImage(file.dataURL, MAX_FILE_BYTES);
+        if (!prepared) {
+          setError(messagesRef.current.imageTooBig);
+          board.markFileSent(id);
+          continue;
+        }
+
+        const encoded = prepared.dataURL.slice(prepared.dataURL.indexOf(',') + 1);
+        const total = Math.max(1, Math.ceil(encoded.length / FILE_CHUNK_CHARS));
+        const created = typeof file.created === 'number' && file.created > 0 ? file.created : Date.now();
+
+        for (let chunk = 0; chunk < total; chunk += 1) {
+          await sdk.state.send(FILE, {
+            id,
+            mimeType: prepared.mimeType,
+            created,
+            chunk,
+            total,
+            data: encoded.slice(chunk * FILE_CHUNK_CHARS, (chunk + 1) * FILE_CHUNK_CHARS),
+          });
+        }
+
+        board.markFileSent(id);
+      }
+    },
+    [sdk],
+  );
+
+  const pushFilesRef = useRef(pushFiles);
+  pushFilesRef.current = pushFiles;
+
   const flush = useCallback(async () => {
-    if (readOnlyRef.current || presenceRef.current?.isDrawing()) return;
+    // A half-resized element must not be published: the room would see the
+    // gesture stop halfway and the next echo would fight the pointer.
+    if (readOnlyRef.current || interacting()) {
+      if (flushTimerRef.current) window.clearTimeout(flushTimerRef.current);
+      flushTimerRef.current = window.setTimeout(() => {
+        flushTimerRef.current = 0;
+        void flushRef.current();
+      }, 300);
+
+      return;
+    }
 
     if (flushingRef.current) {
       againRef.current = true;
@@ -198,6 +321,10 @@ export function App() {
     setError(null);
 
     try {
+      // Before the elements that reference them: a receiver draws the image the
+      // moment its element lands.
+      await pushFilesRef.current(false);
+
       for (const chunk of chunkElements(sendable)) {
         if (chunk.length === 0) continue;
 
@@ -256,7 +383,9 @@ export function App() {
    */
   const compact = useCallback(async () => {
     const board = boardRef.current;
-    if (!board || compactingRef.current || readOnlyRef.current) return;
+    // An empty board is not a snapshot of anything: publishing it would wipe
+    // the room instead of catching up the client that asked.
+    if (!board || board.size === 0 || compactingRef.current || readOnlyRef.current) return;
 
     compactingRef.current = true;
 
@@ -308,6 +437,29 @@ export function App() {
     void compactRef.current();
   };
 
+  /** Any client holding a board answers a late joiner, whatever the order. */
+  answerSyncRef.current = () => {
+    const board = boardRef.current;
+    if (readOnlyRef.current || !board || board.size === 0) return;
+
+    void (async () => {
+      try {
+        await pushFilesRef.current(true);
+        await compactRef.current();
+      } catch (cause) {
+        setError(describe(cause, messagesRef.current));
+      }
+    })();
+  };
+
+  /** The periodic snapshot, still decided by the sorted participant list. */
+  requestSnapshotRef.current = () => {
+    if (!canCompactRef.current()) return;
+
+    forceCompactRef.current = true;
+    maybeCompactRef.current();
+  };
+
   handleRef.current = (event: StateEvent) => {
     if (!readyRef.current) {
       queuedRef.current.push(event);
@@ -327,6 +479,10 @@ export function App() {
 
     if (change?.kind === 'appstate') {
       applyAppStateRef.current();
+    } else if (change?.kind === 'file') {
+      // The bytes are what make the image visible: install them, then redraw.
+      apiRef.current?.addFiles([change.file]);
+      scheduleRender();
     } else {
       // A snapshot carries the page too: after a reset the theme and the grid
       // of the room must be applied to the canvas, not only its elements.
@@ -350,7 +506,17 @@ export function App() {
     );
 
     const offParticipants = sdk.onParticipants((participants) => {
+      const grew = participants.length > participantsRef.current.length;
       participantsRef.current = participants;
+
+      // Someone joined: waiting for the periodic snapshot would leave them in
+      // front of an empty board.
+      if (grew) requestSnapshotRef.current();
+    });
+
+    const offSyncRequests = sdk.action.on((event) => {
+      if (event.type !== SYNC_REQUEST) return;
+      answerSyncRef.current();
     });
 
     const offEnded = sdk.onEnded(() => setEnded(true));
@@ -380,6 +546,13 @@ export function App() {
           forceCompactRef.current = true;
         }
 
+        // The log may have been trimmed while this client was away, and a
+        // trimmed log is a mutilated board: asking the room for a snapshot is
+        // one tiny action, the answer is everything.
+        if (payload.participants.length > 1 && !payload.readOnly) {
+          void sdk.action.send(SYNC_REQUEST, {}).catch(() => undefined);
+        }
+
         const queued = queuedRef.current;
         queuedRef.current = [];
         for (const event of queued) handleRef.current(event);
@@ -396,6 +569,7 @@ export function App() {
       alive = false;
       for (const off of offs) off();
       offParticipants();
+      offSyncRequests();
       offEnded();
     };
   }, [sdk]);
@@ -411,6 +585,15 @@ export function App() {
       sdk,
       self: init.self,
       getActiveTool: () => apiRef.current?.getAppState().activeTool?.type ?? 'selection',
+      getStyle: () => {
+        const state = apiRef.current?.getAppState();
+
+        return {
+          strokeColor: state?.currentItemStrokeColor ?? styleRef.current.strokeColor,
+          strokeWidth: state?.currentItemStrokeWidth ?? styleRef.current.strokeWidth,
+          opacity: state?.currentItemOpacity ?? styleRef.current.opacity,
+        };
+      },
       onCommit: () => {
         scheduleRender();
         scheduleFlush(0);

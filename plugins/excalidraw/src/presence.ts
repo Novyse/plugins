@@ -110,6 +110,10 @@ export interface PresenceOptions {
   getActiveTool: () => string;
   /** The local stroke ended: an element is about to be committed. */
   onCommit: () => void;
+  /**
+   * The color, width and opacity the user has selected right now.
+   */
+  getStyle?: () => LocalStyle;
 }
 
 export class Presence {
@@ -229,13 +233,16 @@ export class Presence {
     const kind = BOX_TOOLS.has(tool) ? 'box' : PATH_TOOLS.has(tool) ? 'path' : null;
     if (!kind) return;
 
+    const style = this.options.getStyle?.() ?? this.style;
+    this.style = style;
+
     this.stroke = {
       id: crypto.randomUUID(),
       kind,
       tool,
-      color: this.style.strokeColor,
-      width: this.style.strokeWidth,
-      opacity: Math.min(100, Math.max(0, this.style.opacity)) / 100,
+      color: style.strokeColor,
+      width: style.strokeWidth,
+      opacity: Math.min(100, Math.max(0, style.opacity)) / 100,
       points: [this.toScene(event)],
       sent: 0,
       lastSentAt: 0,

@@ -32,6 +32,7 @@ export interface Diff {
 export class Board {
   private readonly folder: Folder;
   private readonly sigs = new Map<string, string>();
+  private readonly files = new Set<string>();
 
   constructor(folder: Folder = createFolder()) {
     this.folder = folder;
@@ -56,6 +57,14 @@ export class Board {
 
   has(id: string): boolean {
     return this.sigs.has(id);
+  }
+
+  hasFile(id: string): boolean {
+    return this.files.has(id);
+  }
+
+  markFileSent(id: string): void {
+    this.files.add(id);
   }
 
   elements(): BoardElement[] {
