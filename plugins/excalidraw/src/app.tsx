@@ -135,13 +135,13 @@ export function App() {
   applyAppStateRef.current = applyAppState;
 
   /**
-   * Puts the folded board, the live previews and the local gesture on the canvas.
+   * Puts the folded board and the local gesture on the canvas.
    *
-   * A preview overrides the published version of the same element and adds the
-   * ones the board does not have yet; everything else keeps the object it
-   * already has, so a remote update cannot cancel a drag in progress. The
-   * elements only this screen has — the stroke under the mouse — are appended
-   * as they are: replacing them would delete the line being drawn.
+   * Everything the board knows keeps the object it already has, so a remote
+   * update cannot cancel a drag in progress. The elements only this screen has
+   * — the stroke under the mouse — are appended as they are: replacing them
+   * would delete the line being drawn. The gestures of the room are not here at
+   * all: `presence` draws them, as strokes, in its own overlay.
    */
   const render = useCallback(() => {
     const api = apiRef.current;
@@ -149,18 +149,11 @@ export function App() {
     if (!api || !board) return;
 
     const scene = api.getSceneElements();
-    const previews = board.previewsOf();
     const elements: BoardElement[] = [];
     const known = new Set<string>();
 
     for (const element of board.elements()) {
       known.add(element.id);
-      elements.push(previews.get(element.id) ?? element);
-    }
-
-    for (const [id, element] of previews) {
-      if (known.has(id)) continue;
-      known.add(id);
       elements.push(element);
     }
 
@@ -404,12 +397,6 @@ export function App() {
     if (!api || !board || !presence || readOnlyRef.current) return;
 
     const { upsert } = board.diff(api.getSceneElements());
-    if (upsert.length === 0) return;
-
-    // The bytes before the shape that needs them: a receiver draws the image
-    // the moment the element lands, and an empty rectangle until then.
-    void pushFilesRef.current(false);
-
     for (const element of upsert) presence.publish(element);
   }, []);
 
@@ -546,6 +533,8 @@ export function App() {
       // travelled, and the screen that added the image already has the file.
       if (event.sender !== initRef.current?.self) {
         apiRef.current?.addFiles([change.file]);
+        // The room has these bytes now: they are not re-sent on the next diff.
+        board.markFileSent(change.file.id);
       }
       scheduleRender();
     } else {
@@ -649,17 +638,9 @@ export function App() {
       container,
       sdk,
       self: init.self,
-      // The preview is the element itself, so the receiver draws it with the
-      // renderer of the sender: same style, same width, same text.
-      onPreview: (element) => {
-        if (!boardRef.current) return;
-
-        boardRef.current.setPreview(element);
-        scheduleRenderRef.current();
-      },
-      onPreviewEnd: (id) => {
-        if (boardRef.current?.clearPreview(id)) scheduleRenderRef.current();
-      },
+      // The stroke of the room is drawn by the overlay, with one width and the
+      // color of the theme: the element itself is never previewed.
+      theme: init.theme === 'dark' ? 'dark' : 'light',
     });
 
     presence.setViewport(viewportRef.current);
@@ -693,6 +674,10 @@ export function App() {
           viewModeEnabled={passive}
           excalidrawAPI={(api) => {
             apiRef.current = api as unknown as BoardApi;
+
+            const files = boardRef.current?.imageFiles() ?? [];
+            if (files.length > 0) apiRef.current.addFiles(files);
+
             renderRef.current();
             applyAppStateRef.current();
           }}
