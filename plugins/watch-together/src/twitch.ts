@@ -238,7 +238,8 @@ class TwitchEmbed implements Embed {
       Math.abs(progress) > SEEK_INTENT &&
       Math.abs(progress - elapsed) > SEEK_INTENT;
 
-    if (jumped) this.callbacks.onIntent(true, actual);
+    // The real state of the player: a seek in a paused room must not start it.
+    if (jumped) this.callbacks.onIntent(this.playing(), actual);
 
     this.observedAt = now;
     this.observedPosition = actual;
