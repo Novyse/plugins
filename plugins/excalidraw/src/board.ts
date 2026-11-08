@@ -5,6 +5,7 @@ import {
   signature,
   type BoardAppState,
   type BoardElement,
+  type BoardFile,
   type Change,
   type Folder,
 } from './protocol';
@@ -33,7 +34,6 @@ export class Board {
   private readonly folder: Folder;
   private readonly sigs = new Map<string, string>();
   private readonly files = new Set<string>();
-  private readonly previews = new Map<string, BoardElement>();
 
   constructor(folder: Folder = createFolder()) {
     this.folder = folder;
@@ -48,6 +48,10 @@ export class Board {
   static from(folder: Folder): Board {
     const board = new Board(folder);
     for (const element of folder.elements()) board.remember(element);
+
+    // The bytes were in the log too: the room has them, and re-sending them
+    // would put a second copy of every image on the wire.
+    for (const file of folder.files()) board.markFileSent(file.id);
 
     return board;
   }
@@ -64,23 +68,9 @@ export class Board {
     return this.files.has(id);
   }
 
-  /** The elements being drawn by the room, by id. */
-  previewsOf(): ReadonlyMap<string, BoardElement> {
-    return this.previews;
-  }
-
-  /** Shows one element the room is drawing. */
-  setPreview(element: BoardElement): void {
-    this.previews.set(element.id, element);
-  }
-
-  /** The gesture ended, or the log carried the element: the preview is gone. */
-  clearPreview(id: string): boolean {
-    return this.previews.delete(id);
-  }
-
-  clearPreviews(): void {
-    this.previews.clear();
+  /** The image bytes the log carried: what a late joiner has to install. */
+  imageFiles(): BoardFile[] {
+    return this.folder.files();
   }
 
   markFileSent(id: string): void {
@@ -101,19 +91,11 @@ export class Board {
     if (!change) return null;
 
     if (change.kind === 'upsert') {
-      for (const element of change.elements) {
-        this.remember(element);
-        // The log is the truth now: the preview has done its job.
-        this.previews.delete(element.id);
-      }
+      for (const element of change.elements) this.remember(element);
     } else if (change.kind === 'remove') {
-      for (const id of change.ids) {
-        this.sigs.delete(id);
-        this.previews.delete(id);
-      }
+      for (const id of change.ids) this.sigs.delete(id);
     } else if (change.kind === 'reset') {
       this.sigs.clear();
-      this.previews.clear();
       for (const element of change.elements) this.remember(element);
     }
 
@@ -129,10 +111,6 @@ export class Board {
     for (const element of scene) {
       seen.add(element.id);
 
-      // A preview is the room's element, not a local edit: publishing it
-      // would echo the gesture back as a fact before it ended.
-      if (this.previews.has(element.id)) continue;
-
       const known = this.sigs.get(element.id);
       if (known === signature(element)) continue;
 
@@ -140,7 +118,7 @@ export class Board {
     }
 
     for (const id of this.sigs.keys()) {
-      if (seen.has(id) || this.previews.has(id)) continue;
+      if (seen.has(id)) continue;
       remove.push(id);
     }
 
@@ -195,7 +173,6 @@ export class Board {
   sync(scene: readonly BoardElement[]): void {
     for (const element of scene) {
       if (!this.sigs.has(element.id)) continue;
-      if (this.previews.has(element.id)) continue;
       this.sigs.set(element.id, signature(element));
     }
   }

@@ -1,24 +1,31 @@
 import type { AppSDK, Uuid } from '@novyse/app-sdk';
 
-import { isBoardElement, type BoardElement } from './protocol';
+import type { BoardElement } from './protocol';
 
 /**
- * The live layer: the elements the room is drawing right now, and the cursors.
+ * The live layer: the stroke a participant is drawing right now, and the
+ * cursors.
  *
  * Nothing here is a fact: a preview is an impression of a hand that is still
  * moving, it is never replayed to a late joiner, and it is dropped the moment
  * the element lands in the `STATE` log.
  *
- * Previews carry the *real* Excalidraw element rather than a redrawing of it.
- * A stroke drawn again in SVG cannot have the style, the width or the roughness
- * of the one under the sender's mouse, and it cannot show a text being typed or
- * an image being resized at all: the receiver puts the element it is given on
- * its canvas, so it sees exactly what the sender sees, for every element type,
- * with no second renderer to keep in sync.
+ * Only a freehand stroke is previewed, and it is drawn by this overlay instead
+ * of being put on the canvas: a stroke of the room is one line, one color and
+ * one width, and letting the receiver render the whole element was a second
+ * renderer that never matched the sender (it always came out black, with the
+ * wrong width). Moving and resizing are not previewed at all: the element shows
+ * up when the log carries it.
  */
 
 /** Reliable "the gesture is over": the element is about to be in the log. */
 export const PREVIEW_END = 'PREVIEW_END';
+
+/** Screen width of a stroke of the room, in pixels. */
+const STROKE_WIDTH = 3;
+
+/** The color of a stroke of the room, by theme. */
+const STROKE_COLORS = { dark: '#ffffff', light: '#000000' } as const;
 
 const PALETTE = [
   '#e03131',
@@ -37,11 +44,11 @@ const CURSOR_TTL_MS = 8_000;
 /** A preview that stops arriving belongs to a gesture that stopped. */
 const PREVIEW_TTL_MS = 4_000;
 /**
- * Characters of the element per packet.
+ * Characters of the stroke per packet.
  *
  * A `stream` packet is 8 KiB and the payload is JSON, so the budget stays
- * well below it: a freedraw stroke of a few hundred points is several packets,
- * and a lost one is simply replaced by the next preview of the same element.
+ * well below it: a freedraw stroke of a few hundred points is a few packets,
+ * and a lost one is simply replaced by the next preview of the same stroke.
  */
 const PREVIEW_CHUNK_CHARS = 3_000;
 
@@ -55,10 +62,17 @@ export interface Viewport {
 
 type Point = [number, number];
 
+/** What of a freedraw element travels: where it starts and its own points. */
+interface Stroke {
+  x: number;
+  y: number;
+  points: Point[];
+}
+
 type Packet =
   | { k: 'p'; x: number; y: number }
   | {
-      k: 'v';
+      k: 's';
       id: string;
       seq: number;
       chunk: number;
@@ -79,15 +93,18 @@ interface Incoming {
   touchedAt: number;
 }
 
+interface Preview {
+  stroke: Stroke;
+  touchedAt: number;
+}
+
 export interface PresenceOptions {
   /** The element that contains the Excalidraw canvas. */
   container: HTMLElement;
   sdk: AppSDK;
   self: Uuid;
-  /** An element of the room is being drawn: put it on the canvas. */
-  onPreview(element: BoardElement): void;
-  /** The gesture is over: what the log says is the truth from now on. */
-  onPreviewEnd(id: string): void;
+  /** The theme of the board: it decides the color of the strokes. */
+  theme: 'dark' | 'light';
 }
 
 export class Presence {
@@ -97,8 +114,8 @@ export class Presence {
   private readonly requested = new Set<string>();
   /** Buffers of the previews still arriving, by `<sender>:<element>`. */
   private readonly incoming = new Map<string, Incoming>();
-  /** Previews handed to the canvas, so a silent sender does not freeze one. */
-  private readonly shown = new Map<string, number>();
+  /** Strokes of the room being drawn, by element id. */
+  private readonly previews = new Map<string, Preview>();
   private readonly encoder = new TextEncoder();
   private readonly decoder = new TextDecoder();
 
@@ -139,8 +156,7 @@ export class Presence {
         const data = event.data as { id?: unknown } | null;
         if (typeof data?.id !== 'string') return;
 
-        this.options.onPreviewEnd(data.id);
-        this.shown.delete(data.id);
+        if (this.previews.delete(data.id)) this.dirty = true;
       }),
     );
 
@@ -157,7 +173,7 @@ export class Presence {
     this.svg?.remove();
     this.svg = null;
     this.incoming.clear();
-    this.shown.clear();
+    this.previews.clear();
   }
 
   setViewport(viewport: Viewport): void {
@@ -165,15 +181,18 @@ export class Presence {
     this.dirty = true;
   }
 
-  /** Streams one element of the local canvas to the room. */
+  /** Streams one stroke of the local canvas to the room, if it is one. */
   publish(element: BoardElement): void {
-    const json = JSON.stringify(element);
+    const stroke = strokeOf(element);
+    if (!stroke) return;
+
+    const json = JSON.stringify(stroke);
     const seq = (this.seq += 1);
     const total = Math.max(1, Math.ceil(json.length / PREVIEW_CHUNK_CHARS));
 
     for (let chunk = 0; chunk < total; chunk += 1) {
       this.send({
-        k: 'v',
+        k: 's',
         id: element.id,
         seq,
         chunk,
@@ -246,7 +265,7 @@ export class Presence {
     const key = `${sender}:${packet.id}`;
     let entry = this.incoming.get(key);
 
-    // A newer preview of the same element starts over: the older one is a
+    // A newer preview of the same stroke starts over: the older one is a
     // state of the gesture nobody is in anymore.
     if (!entry || entry.seq !== packet.seq) {
       entry = {
@@ -265,19 +284,12 @@ export class Presence {
 
     this.incoming.delete(key);
 
-    let decoded: unknown;
+    const stroke = parseStroke(this.join(entry));
+    if (!stroke) return;
 
-    try {
-      decoded = JSON.parse(this.join(entry));
-    } catch {
-      return;
-    }
-
-    if (!isBoardElement(decoded)) return;
-
-    this.shown.set(decoded.id, now);
+    this.previews.set(packet.id, { stroke, touchedAt: now });
     this.ensureName(sender);
-    this.options.onPreview(decoded);
+    this.dirty = true;
   }
 
   private join(entry: Incoming): string {
@@ -297,10 +309,9 @@ export class Presence {
       this.incoming.delete(key);
     }
 
-    for (const [id, touchedAt] of this.shown) {
-      if (now - touchedAt <= PREVIEW_TTL_MS) continue;
-      this.shown.delete(id);
-      this.options.onPreviewEnd(id);
+    for (const [id, preview] of this.previews) {
+      if (now - preview.touchedAt <= PREVIEW_TTL_MS) continue;
+      this.previews.delete(id);
       changed = true;
     }
 
@@ -322,6 +333,24 @@ export class Presence {
     const y = (value: number) => (value + scrollY) * zoom;
 
     const parts: string[] = [];
+    const strokeColor = STROKE_COLORS[this.options.theme];
+
+    for (const { stroke } of this.previews.values()) {
+      let path = '';
+
+      stroke.points.forEach((point, index) => {
+        const px = x(stroke.x + point[0]).toFixed(1);
+        const py = y(stroke.y + point[1]).toFixed(1);
+
+        path += `${index === 0 ? 'M' : 'L'}${px} ${py}`;
+      });
+
+      if (!path) continue;
+
+      parts.push(
+        `<path d="${path}" fill="none" stroke="${strokeColor}" stroke-width="${STROKE_WIDTH}" stroke-linecap="round" stroke-linejoin="round"/>`,
+      );
+    }
 
     for (const [sender, cursor] of this.cursors) {
       const color = this.colorOf(sender);
@@ -401,7 +430,7 @@ export class Presence {
         : null;
     }
 
-    if (packet.k !== 'v') return null;
+    if (packet.k !== 's') return null;
     if (typeof packet.id !== 'string' || packet.id.length === 0) return null;
     if (!isFiniteNumber(packet.seq)) return null;
     if (!isFiniteNumber(packet.chunk) || !isFiniteNumber(packet.total)) return null;
@@ -409,7 +438,7 @@ export class Presence {
     if (typeof packet.data !== 'string') return null;
 
     return {
-      k: 'v',
+      k: 's',
       id: packet.id,
       seq: packet.seq,
       chunk: packet.chunk,
@@ -417,6 +446,52 @@ export class Presence {
       data: packet.data,
     };
   }
+}
+
+/** The stroke a freedraw element is, `null` for anything else. */
+function strokeOf(element: BoardElement): Stroke | null {
+  if (element.type !== 'freedraw') return null;
+  if (!isFiniteNumber(element.x) || !isFiniteNumber(element.y)) return null;
+
+  const raw = Array.isArray(element.points) ? element.points : [];
+  const points: Point[] = [];
+
+  for (const point of raw) {
+    if (!Array.isArray(point) || point.length < 2) continue;
+    if (!isFiniteNumber(point[0]) || !isFiniteNumber(point[1])) continue;
+
+    points.push([point[0], point[1]]);
+  }
+
+  return points.length > 0 ? { x: element.x, y: element.y, points } : null;
+}
+
+function parseStroke(json: string): Stroke | null {
+  let value: unknown;
+
+  try {
+    value = JSON.parse(json);
+  } catch {
+    return null;
+  }
+
+  if (!value || typeof value !== 'object') return null;
+
+  const raw = value as Record<string, unknown>;
+
+  if (!isFiniteNumber(raw.x) || !isFiniteNumber(raw.y)) return null;
+  if (!Array.isArray(raw.points) || raw.points.length === 0) return null;
+
+  const points: Point[] = [];
+
+  for (const point of raw.points) {
+    if (!Array.isArray(point) || point.length < 2) return null;
+    if (!isFiniteNumber(point[0]) || !isFiniteNumber(point[1])) return null;
+
+    points.push([point[0], point[1]]);
+  }
+
+  return { x: raw.x, y: raw.y, points };
 }
 
 function isFiniteNumber(value: unknown): value is number {

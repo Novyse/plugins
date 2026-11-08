@@ -271,6 +271,8 @@ export interface Folder {
   apply(event: StateEvent): Change | null;
   /** The board as folded so far, oldest element first. */
   elements(): BoardElement[];
+  /** The image bytes the log carried, for a late joiner to install. */
+  files(): BoardFile[];
   /** The shared page: background and grid. */
   appState(): BoardAppState;
   /** Records a local write, so it is not published again on the next diff. */
@@ -407,6 +409,10 @@ export function createFolder(): Folder {
 
     elements() {
       return [...elements.values()];
+    },
+
+    files() {
+      return [...files.values()];
     },
 
     appState() {
