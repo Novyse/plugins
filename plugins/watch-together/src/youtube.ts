@@ -61,6 +61,15 @@ declare global {
 /** The only state in which the video is really moving. */
 const PLAYING = 1;
 
+/**
+ * How long after a load the player is left alone, in ms.
+ *
+ * Some platforms start the iframe by themselves while it mounts: publishing
+ * that as an intent is what turned a paused room into a playing one for every
+ * participant the moment someone opened the activity.
+ */
+const SETTLE_MS = 2_500;
+
 /** A player that is loading or buffering: leave it alone until it settles. */
 const BUFFERING = 3;
 
@@ -121,9 +130,12 @@ class YouTubeEmbed implements Embed {
   /** Last time the user asked for something: the room must not undo it yet. */
   private intentAt = 0;
   private loaded = false;
-  /** Last position seen while playing, to tell a seek from normal progress. */
+  /** Until this moment a state change is the player loading, not a user. */
+  private settleUntil = 0;
+  /** Last sample, to tell a seek from normal progress. */
   private observedAt = 0;
   private observedPosition = 0;
+  private observedPlaying = false;
 
   constructor(
     private readonly player: YouTubeInstance,
@@ -133,6 +145,7 @@ class YouTubeEmbed implements Embed {
   load(position: number, playing: boolean): void {
     this.loaded = true;
     this.targetPlaying = playing;
+    this.settleUntil = Date.now() + SETTLE_MS;
 
     // A live stream has no position to go to, and seeking to second 0 of a
     // stream that started hours ago is exactly the black screen.
@@ -172,43 +185,51 @@ class YouTubeEmbed implements Embed {
     if (!this.loaded || this.live()) return;
     if (Date.now() - this.appliedAt < APPLY_HOLD_MS) return;
 
-    // A jump is measured against the previous sample, not against the room:
-    // buffering pushes the room clock forward, but it does not move the video.
     const now = Date.now();
     const state = this.playerState();
 
-    // Keep the previous sample across buffering: that is exactly where a seek
-    // made with the player's controls spends its time.
+    // A buffering player is not moving, but it is often on its way to the
+    // position the user picked with the controls: keeping the previous sample
+    // across it is what makes that jump visible when it lands. Resetting the
+    // sample here lost the seek, and the next `align` pulled the player back to
+    // the time of the room — the video reached 1:40 and jumped back to 7:08.
     if (state === BUFFERING) return;
 
-    if (state !== PLAYING) {
-      this.observedAt = 0;
-      return;
-    }
-
+    const playing = state === PLAYING;
     const actual = this.position();
 
     if (!this.observedAt) {
       this.observedAt = now;
       this.observedPosition = actual;
+      this.observedPlaying = playing;
       return;
     }
 
-    const elapsed = (now - this.observedAt) / 1000;
+    // A jump is measured against the previous sample, not against the room:
+    // buffering pushes the room clock forward, but it does not move the video.
+    const elapsed =
+      playing && this.observedPlaying ? (now - this.observedAt) / 1000 : 0;
     const progress = actual - this.observedPosition;
     const jumped =
       Math.abs(progress) > SEEK_INTENT &&
       Math.abs(progress - elapsed) > SEEK_INTENT;
 
-    if (jumped) this.report(true, actual);
+    // The state of the player, not a fixed `true`: a seek made while the room
+    // is paused stays a seek in a paused room instead of starting playback for
+    // everyone.
+    if (jumped) this.report(playing, actual);
 
     this.observedAt = now;
     this.observedPosition = actual;
+    this.observedPlaying = playing;
   }
 
   /** A state change reported by the player, i.e. possibly a user action. */
   intentFrom(state: number): void {
     if (!this.loaded) return;
+
+    // The player starting by itself while it mounts is not an intent.
+    if (Date.now() < this.settleUntil) return;
 
     // The player confirming what was just asked of it is not an intent: only
     // the opposite transition is the user touching the player.
