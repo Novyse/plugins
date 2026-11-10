@@ -525,6 +525,12 @@ export function App() {
 
     const change = board.apply(event);
 
+    if (change?.kind === 'upsert' || change?.kind === 'reset') {
+      presenceRef.current?.drop(change.elements.map((element) => element.id));
+    } else if (change?.kind === 'remove') {
+      presenceRef.current?.drop(change.ids);
+    }
+
     if (change?.kind === 'appstate') {
       applyAppStateRef.current();
     } else if (change?.kind === 'file') {

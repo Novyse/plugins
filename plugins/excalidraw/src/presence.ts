@@ -214,6 +214,19 @@ export class Presence {
     }
   }
 
+  /**
+   * The element landed in the log: its preview is over.
+   */
+  drop(ids: Iterable<string>): void {
+    let changed = false;
+
+    for (const id of ids) {
+      if (this.previews.delete(id)) changed = true;
+    }
+
+    if (changed) this.dirty = true;
+  }
+
   private loop = (): void => {
     this.frame = requestAnimationFrame(this.loop);
 
