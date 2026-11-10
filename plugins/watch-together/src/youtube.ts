@@ -140,6 +140,7 @@ class YouTubeEmbed implements Embed {
   constructor(
     private readonly player: YouTubeInstance,
     private readonly callbacks: EmbedCallbacks,
+    private readonly locked = false,
   ) {}
 
   load(position: number, playing: boolean): void {
@@ -187,7 +188,7 @@ class YouTubeEmbed implements Embed {
   }
 
   tick(): void {
-    if (!this.loaded || this.live()) return;
+    if (!this.loaded || this.live() || this.locked) return;
     if (Date.now() - this.appliedAt < APPLY_HOLD_MS) return;
 
     const now = Date.now();
@@ -231,7 +232,7 @@ class YouTubeEmbed implements Embed {
 
   /** A state change reported by the player, i.e. possibly a user action. */
   intentFrom(state: number): void {
-    if (!this.loaded) return;
+    if (!this.loaded || this.locked) return;
 
     // The player starting by itself while it mounts is not an intent.
     if (Date.now() < this.settleUntil) return;
@@ -307,6 +308,8 @@ class YouTubeEmbed implements Embed {
   }
 
   private report(playing: boolean, position: number): void {
+    if (this.locked) return;
+
     this.targetPlaying = playing;
     this.intentAt = Date.now();
     this.callbacks.onIntent(playing, position);
@@ -343,6 +346,7 @@ export function createYouTube(
   host: HTMLElement,
   source: YoutubeSource,
   callbacks: EmbedCallbacks,
+  locked = false,
 ): Promise<Embed> {
   return loadApi().then(
     (yt) =>
@@ -370,7 +374,7 @@ export function createYouTube(
               playsinline: 1,
               rel: 0,
               modestbranding: 1,
-              controls: 1,
+              controls: locked ? 0 : 1,
               ...(canDeclareOrigin ? { origin } : {}),
             },
             events: {
@@ -380,7 +384,7 @@ export function createYouTube(
                 } catch {
                 }
 
-                embed = new YouTubeEmbed(player, callbacks);
+                embed = new YouTubeEmbed(player, callbacks, locked);
                 resolve(embed);
                 callbacks.onReady();
               },

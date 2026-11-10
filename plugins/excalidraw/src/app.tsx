@@ -105,6 +105,7 @@ export function App() {
 
   const queuedRef = useRef<StateEvent[]>([]);
   const refusedRef = useRef(new Set<string>());
+  const removedRef = useRef(new Map<string, number>());
   const sinceCompactRef = useRef(0);
   const forceCompactRef = useRef(false);
   const compactingRef = useRef(false);
@@ -159,6 +160,11 @@ export function App() {
 
     for (const element of scene) {
       if (known.has(element.id)) continue;
+
+      // The room deleted this element and the canvas still has it
+      const removed = removedRef.current.get(element.id);
+      if (removed !== undefined && element.version <= removed) continue;
+
       known.add(element.id);
       elements.push(element);
     }
@@ -325,7 +331,15 @@ export function App() {
 
     // An element the host already refused as too big is not re-measured and
     // re-sent on every diff: it stays on this screen and the banner says so.
-    const sendable = upsert.filter((element) => !refusedRef.current.has(element.id));
+    const sendable = upsert.filter((element) => {
+      if (refusedRef.current.has(element.id)) return false;
+
+      // A stale copy of an element the room deleted must not travel back: the
+      // canvas can still hold it for a frame, and re-sending it resurrected it
+      // on every other screen.
+      const removed = removedRef.current.get(element.id);
+      return removed === undefined || element.version > removed;
+    });
 
     if (sendable.length === 0 && remove.length === 0 && !page) return;
 
@@ -526,8 +540,23 @@ export function App() {
     const change = board.apply(event);
 
     if (change?.kind === 'upsert' || change?.kind === 'reset') {
+      // The room has these elements: a delete of one of them is over.
+      if (change.kind === 'reset') removedRef.current.clear();
+      for (const element of change.elements) removedRef.current.delete(element.id);
+
       presenceRef.current?.drop(change.elements.map((element) => element.id));
     } else if (change?.kind === 'remove') {
+      // The canvas still holds the element right now: its version is what tells
+      // this stale copy from a local undo of the same id.
+      const stale = new Map(
+        (apiRef.current?.getSceneElements() ?? []).map((element) => [
+          element.id,
+          element.version,
+        ]),
+      );
+
+      for (const id of change.ids) removedRef.current.set(id, stale.get(id) ?? -1);
+
       presenceRef.current?.drop(change.ids);
     }
 

@@ -224,14 +224,19 @@ export function App() {
       },
     };
 
+    // A participant who cannot write the room sees the video, not its
+    // transport: the controls would only be undone by the next tick.
+    const locked = readOnly;
+
     const creation =
       source.kind === 'youtube'
-        ? createYouTube(host, source, callbacks)
+        ? createYouTube(host, source, callbacks, locked)
         : createTwitch(
             host,
             source,
             callbacks,
             snapshotRef.current?.playing ?? false,
+            locked,
           );
 
     creation
