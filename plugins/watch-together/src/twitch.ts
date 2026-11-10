@@ -155,6 +155,7 @@ class TwitchEmbed implements Embed {
     private readonly player: TwitchPlayer,
     private readonly source: TwitchSource,
     private readonly callbacks: EmbedCallbacks,
+    private readonly locked = false,
   ) {}
 
   /** Wires the intent events, once. READY is handled by the factory. */
@@ -212,7 +213,7 @@ class TwitchEmbed implements Embed {
   }
 
   tick(): void {
-    if (!this.loaded || this.source.live) return;
+    if (!this.loaded || this.source.live || this.locked) return;
     if (Date.now() - this.appliedAt < APPLY_HOLD_MS) return;
 
     // A jump is measured against the previous sample, not against the room:
@@ -364,7 +365,7 @@ class TwitchEmbed implements Embed {
    * happens right after a programmatic command.
    */
   private intent(playing: boolean): void {
-    if (!this.loaded || playing === this.targetPlaying) return;
+    if (!this.loaded || this.locked || playing === this.targetPlaying) return;
 
     // A seek can make Twitch pause for a moment. That is not a user pause;
     // applying it would write `false` to the room and freeze every player.
@@ -378,7 +379,7 @@ class TwitchEmbed implements Embed {
 
   /** A seek has no play/pause transition to compare: ignore our own seek. */
   private intentSeek(): void {
-    if (!this.loaded) return;
+    if (!this.loaded || this.locked) return;
     if (Date.now() - this.appliedAt < APPLY_HOLD_MS) return;
 
     this.intentAt = Date.now();
@@ -411,6 +412,7 @@ export function createTwitch(
   source: TwitchSource,
   callbacks: EmbedCallbacks,
   initialPlaying: boolean,
+  locked = false,
 ): Promise<Embed> {
   const parents = parentDomains();
 
@@ -418,7 +420,7 @@ export function createTwitch(
     return Promise.reject(new EmbedError('twitch-no-domain'));
   }
 
-  return createOnce(host, source, callbacks, initialPlaying, parents);
+  return createOnce(host, source, callbacks, initialPlaying, parents, locked);
 }
 
 function createOnce(
@@ -427,6 +429,7 @@ function createOnce(
   callbacks: EmbedCallbacks,
   initialPlaying: boolean,
   parents: string[],
+  locked: boolean,
 ): Promise<Embed> {
   return loadApi().then(
     (twitch) =>
@@ -444,6 +447,7 @@ function createOnce(
             parent: parents,
             autoplay: initialPlaying,
             muted: true,
+            controls: !locked,
             width: '100%',
             height: '100%',
           });
@@ -453,7 +457,7 @@ function createOnce(
           return;
         }
 
-        const embed = new TwitchEmbed(player, source, callbacks);
+        const embed = new TwitchEmbed(player, source, callbacks, locked);
 
         let ready = false;
 
