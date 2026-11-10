@@ -274,7 +274,18 @@ export function App() {
       // A file is played by the app: there is no embed to drive, only a room
       // to follow, and the app reports its own intents back as an action.
       if (current.source.kind === 'file') {
-        void sdk.player.sync(current.playing, expected).catch(() => undefined);
+        // A plugin can be newer than the app that runs it: the bridge only
+        // grows, and a missing member must not throw on every tick.
+        const sync = sdk.player.sync as
+          | ((playing: boolean, position: number) => Promise<void>)
+          | undefined;
+
+        if (typeof sync === 'function') {
+          void sync
+            .call(sdk.player, current.playing, expected)
+            .catch(() => undefined);
+        }
+
         return;
       }
 
@@ -328,6 +339,17 @@ export function App() {
     if (!published) return;
 
     lastSourceRef.current = result.source.url;
+
+    // The write is confirmed by the host, so the player can be shown before
+    // the echo arrives: an activity with no events yet has no snapshot, and
+    // without one the form below is what renders — the arrow did nothing.
+    setSnapshot({
+      source: result.source,
+      playing: false,
+      position: 0,
+      updatedAt: serverNow(),
+      seq: lastSeqRef.current,
+    });
 
     setLink('');
     setLinkError(null);

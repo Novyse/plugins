@@ -162,16 +162,12 @@ class YouTubeEmbed implements Embed {
 
     const state = this.playerState();
 
-    // A player that is buffering is on its way to play: pausing it here is
-    // what turns a click on the video into a black frame
-    if (state === BUFFERING) {
-      if (playing) return;
-
-      this.targetPlaying = false;
-      this.pause();
-
-      return;
-    }
+    // A player that is buffering is on its way somewhere: pausing it here is
+    // what turns a click on the video into a black frame, and it also undoes a
+    // play the user just asked for before the player managed to start. A room
+    // that is paused gets its pause on the next tick, once the player is
+    // actually playing.
+    if (state === BUFFERING) return;
 
     this.targetPlaying = playing;
 
