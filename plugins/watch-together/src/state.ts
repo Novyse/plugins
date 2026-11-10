@@ -11,6 +11,15 @@ import type { StateEvent } from '@novyse/app-sdk';
  */
 export const PLAYBACK = 'PLAYBACK';
 
+/**
+ * The user touched the native player of the app: play, pause or a seek.
+ *
+ * A `file` is decoded by the app, so the sandbox cannot see it: the app reports
+ * what happened as a room action, and this plugin turns it into a `PLAYBACK`
+ * event, because the log has to keep the schema.
+ */
+export const PLAYER_INTENT = 'PLAYER_INTENT';
+
 export interface YoutubeSource {
   kind: 'youtube';
   /** Canonical watch url, so a late joiner loads the same video. */

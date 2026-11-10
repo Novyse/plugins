@@ -6,6 +6,7 @@ import { EmbedError, type Embed, type EmbedCallbacks } from './embed';
 import { messagesFor, normalizeLocale, type Locale, type Messages } from './i18n';
 import {
   PLAYBACK,
+  PLAYER_INTENT,
   detect,
   latestPlayback,
   playbackFromEvent,
@@ -128,6 +129,32 @@ export function App() {
       if (changed) setScreen('video');
     });
 
+    // The native player is owned by the app, which is the only side that can
+    // see a seek or a pause made with its chrome: it reports the intent as a
+    // room action, and the log is written here, where the schema lives.
+    const offPlayerIntent = sdk.action.on((event) => {
+      if (event.type !== PLAYER_INTENT) return;
+
+      // Only the plugin of the user who touched the player writes the log: the
+      // action reaches the whole room, and every copy publishing it would put
+      // the same snapshot in the log once per client.
+      const self = initRef.current?.self;
+      if (!self || event.sender !== self) return;
+
+      const current = snapshotRef.current;
+      if (!current || current.source.kind !== 'file') return;
+
+      const data = event.data as { playing?: unknown; position?: unknown } | null;
+      const position = Number(data?.position);
+      if (!Number.isFinite(position)) return;
+
+      void publish({
+        source: current.source,
+        playing: Boolean(data?.playing),
+        position: Math.max(0, position),
+      });
+    });
+
     // The app player was closed from its back button: back to the first screen.
     const offPlayer = sdk.player.onClosed(() => {
       setEmbedError(null);
@@ -146,6 +173,7 @@ export function App() {
     return () => {
       alive = false;
       offState();
+      offPlayerIntent();
       offPlayer();
       offParticipants();
       offEnded();
@@ -235,17 +263,32 @@ export function App() {
   // number derived from the snapshot, so keeping two players together costs no
   // write at all. `tick` reports a seek made with the player's own controls.
   useEffect(() => {
-    if (!snapshot || screen !== 'video' || snapshot.source.kind === 'file') return;
+    if (!snapshot || screen !== 'video') return;
 
     const timer = window.setInterval(() => {
-      const embed = embedRef.current;
       const current = snapshotRef.current;
-      if (!embed || !current) return;
+      if (!current) return;
+
+      const expected = positionAt(current, serverNow());
+
+      // A file is played by the app: there is no embed to drive, only a room
+      // to follow, and the app reports its own intents back as an action.
+      if (current.source.kind === 'file') {
+        void sdk.player.sync(current.playing, expected).catch(() => undefined);
+        return;
+      }
+
+      const embed = embedRef.current;
+      if (!embed) return;
+
+      // The jump the user just made is read before the room is applied: `align`
+      // seeks the player back to the time of the room, and `tick` compares
+      // against the previous sample, so doing this after erased the seek
+      // before it could ever be published.
+      embed.tick();
 
       embed.apply(current.playing);
-      embed.align(positionAt(current, serverNow()));
-
-      embed.tick();
+      embed.align(expected);
     }, TICK_MS);
 
     return () => window.clearInterval(timer);

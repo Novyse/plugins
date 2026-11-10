@@ -151,6 +151,9 @@ class YouTubeEmbed implements Embed {
     // stream that started hours ago is exactly the black screen.
     if (position >= 1 && !this.live()) this.seekTo(position);
 
+    // Paused by default, then the room decides
+    this.pause();
+
     if (playing) this.play();
   }
 
@@ -160,9 +163,15 @@ class YouTubeEmbed implements Embed {
     const state = this.playerState();
 
     // A player that is buffering is on its way to play: pausing it here is
-    // what turns a click on the video into a black frame. Leave the target
-    // alone too, since the command that started the buffering is still it.
-    if (state === BUFFERING) return;
+    // what turns a click on the video into a black frame
+    if (state === BUFFERING) {
+      if (playing) return;
+
+      this.targetPlaying = false;
+      this.pause();
+
+      return;
+    }
 
     this.targetPlaying = playing;
 
@@ -369,7 +378,12 @@ export function createYouTube(
               ...(canDeclareOrigin ? { origin } : {}),
             },
             events: {
-              onReady: () => {
+              onReady: (event: YouTubeEvent) => {
+                try {
+                  event.target.pauseVideo();
+                } catch {
+                }
+
                 embed = new YouTubeEmbed(player, callbacks);
                 resolve(embed);
                 callbacks.onReady();
