@@ -148,6 +148,10 @@ export interface AppSDK {
     close(): Promise<void>;
     /** The user closed the player from the chrome of the app. */
     onClosed(callback: () => void): () => void;
+    /**
+     * Follows the room: play, pause, and the position to be at.
+     */
+    sync(playing: boolean, position: number): Promise<void>;
   };
 
   storage: {

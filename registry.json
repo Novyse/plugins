@@ -11,14 +11,14 @@
         "url": "https://github.com/Novyse"
       },
       "description": "Watch YouTube, Twitch or a video file together, in sync, from inside the voice room.",
-      "version": "0.2.2",
-      "tag": "watch-together@0.2.2",
+      "version": "0.2.3",
+      "tag": "watch-together@0.2.3",
       "icon": "plugins/watch-together/store/icon.png",
       "banner": "plugins/watch-together/store/banner.png",
       "entry": "plugins/watch-together/dist/index.html",
       "bundle": "watch-together-bundle.zip",
-      "sha256": "14c707360e46832b4eee2102836c7dbdcd604a5abd33bc0abcdb25061012f79b",
-      "sizeBytes": 52080,
+      "sha256": "c2601e0364f7398f33f9070b941a27e87cea1c26550805679e16cfffe71edbc7",
+      "sizeBytes": 52559,
       "capabilities": [
         "network"
       ],
@@ -46,14 +46,14 @@
         "url": "https://github.com/Novyse"
       },
       "description": "A shared Excalidraw whiteboard, one per voice room: everyone draws on the same board, every stroke in sync.",
-      "version": "0.1.4",
-      "tag": "excalidraw@0.1.4",
+      "version": "0.1.5",
+      "tag": "excalidraw@0.1.5",
       "icon": "plugins/excalidraw/store/icon.png",
       "banner": "plugins/excalidraw/store/banner.png",
       "entry": "plugins/excalidraw/dist/index.html",
       "bundle": "excalidraw-bundle.zip",
-      "sha256": "ea5a05d33f372d6252c2b859222b2a4b43d03b277be002d152c60b39b0a7c512",
-      "sizeBytes": 7667740,
+      "sha256": "5ed5171b9492ed089f27ef802d3711feec3da7a7399d933391f23e6634a2eed2",
+      "sizeBytes": 7667954,
       "capabilities": [
         "stream"
       ],
