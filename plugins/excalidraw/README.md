@@ -35,6 +35,6 @@ only yours, so nobody can drag the board away from under the others.
 
 - **Images and embeds** added to the board are not shared yet: they stay on the
   device that added them.
-- A room can hold a lot of drawing, but not an infinite one: the oldest part of
-  a very long session is folded into a snapshot to keep the room responsive.
+- A room can hold a lot of drawing, but not an infinite one: the log of the
+  room is trimmed at some point, and the oldest strokes are the first to go.
 - The board is deleted with the room, it is not an archive.

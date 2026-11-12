@@ -50,7 +50,6 @@ so the log *is* the board. Four event types, each a complete statement:
 | `UPSERT` | `{ elements: ExcalidrawElement[] }` | the elements that changed, added or updated |
 | `DELETE` | `{ ids: string[] }` | the elements that are gone |
 | `APP_STATE` | `{ viewBackgroundColor?, gridSize? }` | the page: background and grid |
-| `COMPACT` | `{ cid, chunk, total, elements, appState }` | a full snapshot, replacing everything before it |
 
 Add and update are one event because Excalidraw versions its elements: two
 clients editing the same one are resolved with their own rule, higher `version`
@@ -69,13 +68,14 @@ normalize an element it is given.
 `APP_STATE` is compared field by field against `folder.appState()`, so a redraw
 that does not touch the background sends nothing.
 
-### Compaction
+### No snapshots
 
-The server trims the log, and `init().state.truncated` says the oldest events may
-be gone. `COMPACT` replaces the elements and the page with a snapshot, split in
-chunks small enough for one event (`chunkElements`) so a snapshot is several
-events with the same `cid`; a folder holds a partial snapshot until every chunk
-arrives, so an interrupted one never truncates the board.
+There is no snapshot event, on purpose. `STATE` is append-only and the log *is*
+the board: a joiner folds every event it receives at `init()` and that is the
+whole history, in the only order the server ever assigned. A snapshot would be a
+second, competing history — a client could publish one built from a board it
+believed complete and replace the room with it, which is exactly the loss a
+monotonic log exists to prevent.
 
 The budget is not a guess: the host refuses a `STATE` write whose `data` is over
 16 KiB, counted in UTF-8 bytes, with `E_TOO_LARGE`. `chunkElements` and
@@ -84,10 +84,8 @@ included, so a chunk that is measured as fitting can never be refused. An
 element that is over the ceiling on its own is left out of the room and the
 banner says so, instead of stopping every other change with it.
 
-Only one client compacts, or the log fills with identical snapshots. The rule is
-deterministic and needs no election: the first participant in sort order, every
-120 events, or immediately when the log came back truncated and holds no
-snapshot.
+If the server trimmed the log, `init().state.truncated` says the oldest events
+are gone: the board starts from what the log still holds.
 
 ### Applying a remote event
 

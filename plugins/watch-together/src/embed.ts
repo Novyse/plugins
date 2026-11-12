@@ -9,6 +9,7 @@ export type EmbedErrorCode =
   | 'youtube-fetch-failed'
   | 'youtube-refused'
   | 'twitch-no-domain'
+  | 'twitch-origin-blocked'
   | 'twitch-not-available'
   | 'twitch-fetch-failed';
 

@@ -9,12 +9,10 @@ import { Presence, type Viewport } from './presence';
 import { shrinkImage } from './image';
 import {
   APP_STATE,
-  COMPACT,
   DEFAULT_APP_STATE,
   DELETE,
   EVENT_TYPES,
   FILE,
-  SYNC_REQUEST,
   UPSERT,
   chunkElements,
   chunkIds,
@@ -24,8 +22,6 @@ import {
   type BoardFile,
 } from './protocol';
 
-/** How many events before the owner of the board republishes a snapshot. */
-const COMPACT_EVERY = 120;
 /** Debounce of the local diff: a drag is many changes, one write. */
 const FLUSH_MS = 150;
 
@@ -106,9 +102,6 @@ export function App() {
   const queuedRef = useRef<StateEvent[]>([]);
   const refusedRef = useRef(new Set<string>());
   const removedRef = useRef(new Map<string, number>());
-  const sinceCompactRef = useRef(0);
-  const forceCompactRef = useRef(false);
-  const compactingRef = useRef(false);
   const flushingRef = useRef(false);
   const againRef = useRef(false);
   const flushTimerRef = useRef(0);
@@ -226,13 +219,8 @@ export function App() {
 
   // ----------------------------------------------------------------- protocol
 
-  const compactRef = useRef<() => Promise<void>>(async () => {});
-  const canCompactRef = useRef<() => boolean>(() => true);
-  const maybeCompactRef = useRef<() => void>(() => {});
   const flushRef = useRef<() => Promise<void>>(async () => {});
   const handleRef = useRef<(event: StateEvent) => void>(() => {});
-  const answerSyncRef = useRef<() => void>(() => {});
-  const requestSnapshotRef = useRef<() => void>(() => {});
 
   /**
    * Publishes what the local user changed since the last known state.
@@ -251,7 +239,7 @@ export function App() {
    * and a screenshot is not.
    */
   const pushFiles = useCallback(
-    async (all: boolean) => {
+    async () => {
       const api = apiRef.current;
       const board = boardRef.current;
       if (!api || !board) return;
@@ -268,7 +256,7 @@ export function App() {
       const files = api.getFiles();
 
       for (const id of referenced) {
-        if (!all && board.hasFile(id)) continue;
+        if (board.hasFile(id)) continue;
 
         const file = files[id];
         if (!file || typeof file.dataURL !== 'string' || file.dataURL.length === 0) continue;
@@ -349,7 +337,7 @@ export function App() {
     try {
       // Before the elements that reference them: a receiver draws the image the
       // moment its element lands.
-      await pushFilesRef.current(false);
+      await pushFilesRef.current();
 
       for (const chunk of chunkElements(sendable)) {
         if (chunk.length === 0) continue;
@@ -435,93 +423,6 @@ export function App() {
     }, delay);
   }, []);
 
-  /**
-   * Republishes the whole board as a snapshot.
-   *
-   * The log is not infinite: the server trims it, and `init().truncated` says so.
-   * A snapshot is what makes the board rebuildable from any point after it, and
-   * it also keeps the log short for the next late joiner. The page travels with
-   * it, so a snapshot is enough to rebuild the whole room.
-   */
-  const compact = useCallback(async () => {
-    const board = boardRef.current;
-    // An empty board is not a snapshot of anything: publishing it would wipe
-    // the room instead of catching up the client that asked.
-    if (!board || board.size === 0 || compactingRef.current || readOnlyRef.current) return;
-
-    compactingRef.current = true;
-
-    try {
-      const chunks = chunkElements(board.elements());
-      const cid = `${initRef.current?.self ?? 'board'}:${Date.now().toString(36)}`;
-
-      for (let index = 0; index < chunks.length; index += 1) {
-        await sdk.state.send(COMPACT, {
-          cid,
-          chunk: index,
-          total: chunks.length,
-          elements: chunks[index],
-          appState: board.appState(),
-        });
-      }
-
-      sinceCompactRef.current = 0;
-    } catch (cause) {
-      setError(describe(cause, messagesRef.current));
-    } finally {
-      compactingRef.current = false;
-    }
-  }, [sdk]);
-
-  compactRef.current = compact;
-
-  // Only one client compacts, or the log would fill with identical snapshots.
-  // The choice is deterministic and needs no election: the first participant.
-  canCompactRef.current = () => {
-    const self = initRef.current?.self;
-    if (!self) return false;
-
-    const participants = [...participantsRef.current].sort();
-    if (participants.length === 0) return true;
-
-    return participants[0] === self;
-  };
-
-  maybeCompactRef.current = () => {
-    if (!readyRef.current || readOnlyRef.current) return;
-
-    const forced = forceCompactRef.current;
-    if (!forced && sinceCompactRef.current < COMPACT_EVERY) return;
-    if (compactingRef.current || interacting()) return;
-    if (!canCompactRef.current()) return;
-
-    forceCompactRef.current = false;
-    void compactRef.current();
-  };
-
-  /** Any client holding a board answers a late joiner, whatever the order. */
-  answerSyncRef.current = () => {
-    const board = boardRef.current;
-    if (readOnlyRef.current || !board || board.size === 0) return;
-
-    void (async () => {
-      try {
-        await pushFilesRef.current(true);
-        await compactRef.current();
-      } catch (cause) {
-        setError(describe(cause, messagesRef.current));
-      }
-    })();
-  };
-
-  /** The periodic snapshot, still decided by the sorted participant list. */
-  requestSnapshotRef.current = () => {
-    if (!canCompactRef.current()) return;
-
-    forceCompactRef.current = true;
-    maybeCompactRef.current();
-  };
-
   handleRef.current = (event: StateEvent) => {
     if (!readyRef.current) {
       queuedRef.current.push(event);
@@ -534,14 +435,10 @@ export function App() {
     const board = boardRef.current;
     if (!board) return;
 
-    // A snapshot from anyone is a fresh baseline for the log we have.
-    if (event.type === COMPACT) sinceCompactRef.current = 0;
-
     const change = board.apply(event);
 
-    if (change?.kind === 'upsert' || change?.kind === 'reset') {
+    if (change?.kind === 'upsert') {
       // The room has these elements: a delete of one of them is over.
-      if (change.kind === 'reset') removedRef.current.clear();
       for (const element of change.elements) removedRef.current.delete(element.id);
 
       presenceRef.current?.drop(change.elements.map((element) => element.id));
@@ -572,15 +469,9 @@ export function App() {
         board.markFileSent(change.file.id);
       }
       scheduleRender();
-    } else {
-      // A snapshot carries the page too: after a reset the theme and the grid
-      // of the room must be applied to the canvas, not only its elements.
-      if (change?.kind === 'reset' && change.appState) applyAppStateRef.current();
-      if (change || event.type === COMPACT) scheduleRender();
+    } else if (change) {
+      scheduleRender();
     }
-
-    sinceCompactRef.current += 1;
-    maybeCompactRef.current();
   };
 
   // ------------------------------------------------------------------- boot
@@ -595,17 +486,8 @@ export function App() {
     );
 
     const offParticipants = sdk.onParticipants((participants) => {
-      const grew = participants.length > participantsRef.current.length;
+      // The room counts them; the board is the log, not a snapshot per joiner.
       participantsRef.current = participants;
-
-      // Someone joined: waiting for the periodic snapshot would leave them in
-      // front of an empty board.
-      if (grew) requestSnapshotRef.current();
-    });
-
-    const offSyncRequests = sdk.action.on((event) => {
-      if (event.type !== SYNC_REQUEST) return;
-      answerSyncRef.current();
     });
 
     const offEnded = sdk.onEnded(() => setEnded(true));
@@ -629,26 +511,12 @@ export function App() {
         setInit(payload);
         setLocale(normalizeLocale(payload.locale));
 
-        // A trimmed log only hurts when it holds no snapshot: otherwise the
-        // beginning of the board is simply gone and a snapshot has to be made.
-        if (payload.state.truncated && folder.compacts() === 0) {
-          forceCompactRef.current = true;
-        }
-
-        // The log may have been trimmed while this client was away, and a
-        // trimmed log is a mutilated board: asking the room for a snapshot is
-        // one tiny action, the answer is everything.
-        if (payload.participants.length > 1 && !payload.readOnly) {
-          void sdk.action.send(SYNC_REQUEST, {}).catch(() => undefined);
-        }
-
         const queued = queuedRef.current;
         queuedRef.current = [];
         for (const event of queued) handleRef.current(event);
 
         renderRef.current();
         applyAppStateRef.current();
-        maybeCompactRef.current();
       })
       .catch((cause: unknown) => {
         if (alive) setError(describe(cause, messagesRef.current));
@@ -658,7 +526,6 @@ export function App() {
       alive = false;
       for (const off of offs) off();
       offParticipants();
-      offSyncRequests();
       offEnded();
     };
   }, [sdk]);

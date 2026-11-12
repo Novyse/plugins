@@ -68,6 +68,13 @@ and emits `activity:player { state: 'closed' }`, which the plugin receives as
 `sdk.player.onClosed`: the tile is back on the first screen. The WebView stays
 mounted underneath, so the plugin keeps receiving the state of the room.
 
+The controls of that player are not a room of the app: `sdk.player.onIntent`
+reports a play, pause or seek made with them, and the plugin publishes it as a
+`PLAYBACK` like any intent of an embed. The host does not write anything and
+does not invent a vocabulary, so a `file` follows the same code path as
+YouTube and Twitch, and a plugin that needs a faster channel is free to use
+`action.send` instead.
+
 The native player is not available in the browser harness: `player.open`
 rejects with `E_UNSUPPORTED` there, and the plugin says so. File playback has to
 be tested inside the app.

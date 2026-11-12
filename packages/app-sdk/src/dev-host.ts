@@ -262,6 +262,9 @@ export function installDevHost(options: DevHostOptions): void {
       onClosed() {
         return () => {};
       },
+      onIntent() {
+        return () => {};
+      },
       async sync() {
         // A browser tab has no native player to keep in step.
       },

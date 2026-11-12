@@ -48,6 +48,8 @@ const EN_ERRORS: Record<Exclude<EmbedErrorCode, 'youtube-refused'>, string> = {
   'youtube-not-available': 'The YouTube player is not available',
   'youtube-fetch-failed': 'The YouTube player could not be fetched',
   'twitch-no-domain': 'Twitch cannot be embedded here: no domain to declare',
+  'twitch-origin-blocked':
+    'Twitch cannot be embedded in a browser tab: use the app, or watch it on Twitch',
   'twitch-not-available': 'The Twitch player is not available',
   'twitch-fetch-failed': 'The Twitch player could not be fetched',
 };
@@ -56,6 +58,8 @@ const IT_ERRORS: Record<Exclude<EmbedErrorCode, 'youtube-refused'>, string> = {
   'youtube-not-available': 'Il player di YouTube non è disponibile',
   'youtube-fetch-failed': 'Impossibile caricare il player di YouTube',
   'twitch-no-domain': 'Twitch non può essere incorporato qui: nessun dominio da dichiarare',
+  'twitch-origin-blocked':
+    "Twitch non può essere incorporato in una scheda del browser: usa l'app, o guardalo su Twitch",
   'twitch-not-available': 'Il player di Twitch non è disponibile',
   'twitch-fetch-failed': 'Impossibile caricare il player di Twitch',
 };
