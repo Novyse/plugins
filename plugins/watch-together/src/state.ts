@@ -265,14 +265,3 @@ export function positionAt(snapshot: PlaybackSnapshot | null, now: number): numb
 
   return snapshot.position + Math.max(0, (now - snapshot.updatedAt) / 1000);
 }
-
-/** `88` → `1:28`, `3725` → `1:02:05`. */
-export function formatTime(seconds: number): string {
-  const total = Math.max(0, Math.floor(seconds));
-  const hours = Math.floor(total / 3600);
-  const minutes = Math.floor((total % 3600) / 60);
-  const rest = total % 60;
-  const pad = (value: number) => value.toString().padStart(2, '0');
-
-  return hours > 0 ? `${hours}:${pad(minutes)}:${pad(rest)}` : `${minutes}:${pad(rest)}`;
-}

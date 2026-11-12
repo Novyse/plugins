@@ -1,4 +1,4 @@
-import { useCallback, useEffect, useRef, useState } from 'react';
+import { useCallback, useEffect, useRef, useState, type ComponentProps } from 'react';
 
 import { Excalidraw } from '@excalidraw/excalidraw';
 import { getAppSDK, type InitPayload, type StateEvent } from '@novyse/app-sdk';
@@ -67,6 +67,14 @@ interface ContainerState {
   multiElement?: unknown;
 }
 
+/**
+ * The scene `<Excalidraw>` starts from.
+ *
+ * Taken from the component's own props instead of Excalidraw's exported types:
+ * the protocol only knows the structural element, and the cast is needed once.
+ */
+type InitialScene = ComponentProps<typeof Excalidraw>['initialData'];
+
 /** The page on screen, as the protocol sees it. */
 function appStateOf(state: ContainerState): BoardAppState {
   return {
@@ -92,6 +100,7 @@ export function App() {
   const presenceRef = useRef<Presence | null>(null);
   const canvasRef = useRef<HTMLDivElement | null>(null);
   const initRef = useRef<InitPayload | null>(null);
+  const initialSceneRef = useRef<InitialScene>(undefined);
 
   const readyRef = useRef(false);
   const seenRef = useRef(new Set<string>());
@@ -184,7 +193,9 @@ export function App() {
    */
   const interacting = useCallback(() => {
     const state = apiRef.current?.getAppState();
-    if (!state) return false;    return Boolean(
+    if (!state) return false;
+
+    return Boolean(
       state.selectedElementsAreBeingDragged ||
         state.newElement ||
         state.editingElement ||
@@ -224,14 +235,6 @@ export function App() {
   const flushRef = useRef<() => Promise<void>>(async () => {});
   const handleRef = useRef<(event: StateEvent) => void>(() => {});
 
-  /**
-   * Publishes what the local user changed since the last known state.
-   *
-   * Additions, updates, deletions and the background come from one comparison
-   * against the baseline, so a paste of fifty elements, a resize, an eraser
-   * stroke and a new background all cost a predictable number of events instead
-   * of one per element.
-   */
   /**
    * Publishes the images the room does not have yet.
    *
@@ -512,6 +515,21 @@ export function App() {
 
         boardRef.current = board;
         initRef.current = payload;
+
+        // The first scene of the canvas is the board, handed over as
+        // `initialData`: it is the only scene Excalidraw is guaranteed to keep.
+        // An `updateScene` issued from `excalidrawAPI` lands while the canvas is
+        // still being created, and the empty scene it mounts from wins — which
+        // is why a joiner saw an empty board until the next redraw (a remote
+        // echo, or a gesture of their own) pushed the elements again.
+        initialSceneRef.current = {
+          elements: board.elements(),
+          appState: board.appState(),
+          files: Object.fromEntries(
+            board.imageFiles().map((file) => [file.id, file]),
+          ),
+        } as unknown as InitialScene;
+
         lastSeqRef.current = payload.state.seq;
         participantsRef.current = payload.participants;
         readOnlyRef.current = payload.readOnly;
@@ -523,9 +541,6 @@ export function App() {
         const queued = queuedRef.current;
         queuedRef.current = [];
         for (const event of queued) handleRef.current(event);
-
-        renderRef.current();
-        applyAppStateRef.current();
       })
       .catch((cause: unknown) => {
         if (alive) setError(describe(cause, messagesRef.current));
@@ -583,6 +598,7 @@ export function App() {
         <Excalidraw
           theme={init.theme === 'dark' ? 'dark' : 'light'}
           langCode={locale === 'it' ? 'it-IT' : 'en'}
+          initialData={initialSceneRef.current}
           viewModeEnabled={passive}
           excalidrawAPI={(api) => {
             apiRef.current = api as unknown as BoardApi;

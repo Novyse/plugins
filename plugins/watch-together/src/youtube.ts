@@ -179,14 +179,6 @@ class YouTubeEmbed implements Embed {
     else this.pause();
   }
 
-  seek(position: number): void {
-    if (!this.live()) this.seekTo(position);
-  }
-
-  state(): { playing: boolean; position: number } {
-    return { playing: this.playerState() === PLAYING, position: this.position() };
-  }
-
   tick(): void {
     if (!this.loaded || this.live() || this.locked) return;
     if (Date.now() - this.appliedAt < APPLY_HOLD_MS) return;

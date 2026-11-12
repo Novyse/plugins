@@ -11,9 +11,9 @@
  *
  * - `parent` is mandatory and must name the domain that hosts the frame. On
  *   native the document is served from `http://127.0.0.1:<port>`, which Twitch
- *   accepts for local development; on the web the sandbox lives in an opaque
- *   document, so the ancestor has to be read from the referrer. No domain, no
- *   embed, and the UI says so;
+ *   accepts for local development; on the web the sandbox lives in an
+ *   `about:srcdoc` document, whose own origin is opaque, so the ancestor has to
+ *   be read from the referrer. No domain, no embed, and the UI says so;
  * - a channel is live: there is no position to sync, only play and pause. A
  *   VOD (`/videos/<id>`) behaves like a video.
  */
@@ -36,7 +36,6 @@ interface TwitchPlayer {
   play(): void;
   seek(seconds: number): void;
   setMuted?(muted: boolean): void;
-  getMuted?(): boolean;
 }
 
 type TwitchPlayerConstructor = {
@@ -98,27 +97,53 @@ function loadApi(): Promise<TwitchApi> {
 }
 
 /**
- * The domains Twitch may see above its frame.
+ * The hostname of the page the sandbox sits in, `null` when there is none.
  *
- * On native the document host is the loopback server of the app; on the web it
- * is usually empty (`about:srcdoc`), and the only trace of the real page is the
- * referrer. When neither is there, Twitch cannot be embedded at all: guessing
- * would only make the iframe render its own error page.
+ * `window.location` is not the page on the web: there the document is mounted
+ * as `about:srcdoc`, whose url has an opaque origin — the browser reports it as
+ * `"null"` — so a check built on it fails before Twitch is even asked, and the
+ * error it produces looks like a refusal of the page itself. The real page is
+ * only visible through the referrer and `location.ancestorOrigins`; on native
+ * the document has an `http` origin of its own and that is the answer.
+ *
+ * When none of them resolves, Twitch cannot be embedded at all: guessing would
+ * only make its iframe render its own error page.
  */
-function isHttpOrigin(origin: string): boolean {
-  try {
-    const protocol = new URL(origin).protocol;
-    return protocol === 'http:' || protocol === 'https:';
-  } catch {
-    return false;
+function pageHostname(): string | null {
+  const candidates: string[] = [
+    window.location.href,
+    document.referrer,
+    ...Array.from(document.location.ancestorOrigins ?? []),
+  ];
+
+  for (const candidate of candidates) {
+    if (!candidate) continue;
+
+    try {
+      const url = new URL(candidate);
+      if (url.protocol !== 'http:' && url.protocol !== 'https:') continue;
+      if (url.hostname) return url.hostname;
+    } catch {
+      // Not a url (`about:srcdoc`, `null`): try the next one.
+    }
   }
+
+  return null;
 }
 
+/**
+ * The domains Twitch may see above its frame.
+ *
+ * The page, plus every ancestor that has a domain: Twitch matches the ancestor
+ * it sees against this list, and a page can be framed.
+ */
 function parentDomains(): string[] {
   const domains = new Set<string>();
-  const hostname = window.location.hostname;
+  const hostname = pageHostname();
 
-  if (hostname) domains.add(hostname);
+  if (!hostname) return [];
+
+  domains.add(hostname);
 
   if (hostname === '127.0.0.1' || hostname === 'localhost') {
     // Twitch matches the ancestor against the list: declare both spellings.
@@ -126,17 +151,6 @@ function parentDomains(): string[] {
     domains.add('localhost');
   }
 
-  try {
-    if (document.referrer) {
-      const referrer = new URL(document.referrer).hostname;
-      if (referrer) domains.add(referrer);
-    }
-  } catch {
-    // The referrer is not a url: nothing to declare.
-  }
-
-  // A frame served from `about:srcdoc` has no host of its own: the ancestors
-  // are then the only trace of the page Twitch has to match.
   for (const origin of Array.from(document.location.ancestorOrigins ?? [])) {
     try {
       const domain = new URL(origin).hostname;
@@ -222,14 +236,6 @@ class TwitchEmbed implements Embed {
     this.targetPlaying = playing;
     if (playing) this.play();
     else this.pause();
-  }
-
-  seek(position: number): void {
-    if (!this.source.live) this.seekTo(position);
-  }
-
-  state(): { playing: boolean; position: number } {
-    return { playing: this.playing(), position: this.position() };
   }
 
   tick(): void {
@@ -434,7 +440,7 @@ export function createTwitch(
   initialPlaying: boolean,
   locked = false,
 ): Promise<Embed> {
-  if (!isHttpOrigin(window.location.origin)) {
+  if (!pageHostname()) {
     return Promise.reject(new EmbedError('twitch-origin-blocked'));
   }
 

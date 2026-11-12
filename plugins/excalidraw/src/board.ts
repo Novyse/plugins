@@ -56,14 +56,6 @@ export class Board {
     return board;
   }
 
-  get size(): number {
-    return this.folder.elements().length;
-  }
-
-  has(id: string): boolean {
-    return this.sigs.has(id);
-  }
-
   hasFile(id: string): boolean {
     return this.files.has(id);
   }

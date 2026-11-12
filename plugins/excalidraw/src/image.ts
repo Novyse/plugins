@@ -12,7 +12,7 @@
 const MAX_SIDE = 1600;
 
 /** Bytes the base64 text of [dataURL] stands for. */
-export function binaryBytes(dataURL: string): number {
+function binaryBytes(dataURL: string): number {
   const comma = dataURL.indexOf(',');
   if (comma < 0) return 0;
 
