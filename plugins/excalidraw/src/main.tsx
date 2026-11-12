@@ -14,7 +14,7 @@ import { messagesFor, normalizeLocale } from './i18n';
 // tabs are two participants and a third tab is the late joiner. A build drops
 // this branch, and the real `window.AppSDK` of the app is used instead.
 if (import.meta.env.DEV) {
-  installDevHost({ slug: 'excalidraw', version: '0.1.0' });
+  installDevHost({ slug: 'excalidraw', version: '0.1.9' });
 
   // `?readonly=1` exercises the passive view without the app, which is the only
   // way to check it locally.

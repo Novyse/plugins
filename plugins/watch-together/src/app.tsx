@@ -26,7 +26,6 @@ export function App() {
 
   const [init, setInit] = useState<InitPayload | null>(null);
   const [snapshot, setSnapshot] = useState<PlaybackSnapshot | null>(null);
-  const [clockOffset, setClockOffset] = useState(0);
 
   const [screen, setScreen] = useState<'input' | 'video'>('input');
   const [link, setLink] = useState('');
@@ -51,7 +50,6 @@ export function App() {
 
   snapshotRef.current = snapshot;
   initRef.current = init;
-  offsetRef.current = clockOffset;
   messagesRef.current = t;
 
   const serverNow = () => Date.now() + offsetRef.current;
@@ -103,7 +101,6 @@ export function App() {
 
         setInit(payload);
         setLocale(normalizeLocale(payload.locale));
-        setClockOffset(payload.serverNow - Date.now());
         setSnapshot(last);
         setScreen(last ? 'video' : 'input');
       })
@@ -161,10 +158,6 @@ export function App() {
       setScreen('input');
     });
 
-    const offParticipants = sdk.onParticipants(() => {
-      // Counted by the room, nothing to do here: the host owns the list.
-    });
-
     const offEnded = sdk.onEnded(() => {
       setLinkError(messagesRef.current.activityClosed);
     });
@@ -174,7 +167,6 @@ export function App() {
       offState();
       offPlayerIntent();
       offPlayer();
-      offParticipants();
       offEnded();
     };
   }, []);

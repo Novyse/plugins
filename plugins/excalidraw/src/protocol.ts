@@ -89,9 +89,6 @@ export const DEFAULT_APP_STATE: BoardAppState = {
   gridSize: null,
 };
 
-/** Fields a `APP_STATE` payload may carry. */
-export const APP_STATE_FIELDS = ['viewBackgroundColor', 'gridSize'] as const;
-
 /** A color Excalidraw can put on a canvas: hex, a name, `transparent`. */
 function isColor(value: string): boolean {
   return value.length > 0 && value.length <= 32 && !/[\s;{}<>"']/.test(value);
