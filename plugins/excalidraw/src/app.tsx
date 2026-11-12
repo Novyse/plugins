@@ -94,6 +94,8 @@ export function App() {
   const initRef = useRef<InitPayload | null>(null);
 
   const readyRef = useRef(false);
+  const seenRef = useRef(new Set<string>());
+  const aliveRef = useRef(true);
   const lastSeqRef = useRef(0);
   const readOnlyRef = useRef(false);
   const participantsRef = useRef<string[]>([]);
@@ -293,6 +295,8 @@ export function App() {
   pushFilesRef.current = pushFiles;
 
   const flush = useCallback(async () => {
+    if (!aliveRef.current) return;
+
     // A half-resized element must not be published: the room would see the
     // gesture stop halfway and the next echo would fight the pointer.
     if (readOnlyRef.current || interacting()) {
@@ -314,7 +318,12 @@ export function App() {
     const board = boardRef.current;
     if (!api || !board) return;
 
-    const { upsert, remove } = board.diff(api.getSceneElements());
+    const scene = api.getSceneElements();
+
+    for (const element of scene) seenRef.current.add(element.id);
+
+    const { upsert, remove: stale } = board.diff(scene);
+    const remove = stale.filter((id) => seenRef.current.has(id));
     const page = board.diffAppState(appStateOf(api.getAppState()));
 
     // An element the host already refused as too big is not re-measured and
@@ -524,6 +533,7 @@ export function App() {
 
     return () => {
       alive = false;
+      aliveRef.current = false;
       for (const off of offs) off();
       offParticipants();
       offEnded();

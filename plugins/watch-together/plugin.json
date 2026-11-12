@@ -2,15 +2,22 @@
   "id": "watch-together",
   "name": "Watch Together",
   "description": "Watch YouTube, Twitch or a video file together, in sync, from inside the voice room.",
-  "version": "0.2.7",
+  "version": "0.2.8",
   "author": {
     "name": "Novyse",
     "url": "https://github.com/Novyse"
   },
-  "capabilities": ["network"],
-  "locales": ["en", "it"],
+  "capabilities": [
+    "network"
+  ],
+  "locales": [
+    "en",
+    "it"
+  ],
   "permissions": {
-    "channels": ["state"],
+    "channels": [
+      "state"
+    ],
     "frame": [
       "https://www.youtube.com",
       "https://www.youtube-nocookie.com",
