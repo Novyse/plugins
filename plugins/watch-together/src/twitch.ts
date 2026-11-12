@@ -105,6 +105,15 @@ function loadApi(): Promise<TwitchApi> {
  * referrer. When neither is there, Twitch cannot be embedded at all: guessing
  * would only make the iframe render its own error page.
  */
+function isHttpOrigin(origin: string): boolean {
+  try {
+    const protocol = new URL(origin).protocol;
+    return protocol === 'http:' || protocol === 'https:';
+  } catch {
+    return false;
+  }
+}
+
 function parentDomains(): string[] {
   const domains = new Set<string>();
   const hostname = window.location.hostname;
@@ -425,9 +434,7 @@ export function createTwitch(
   initialPlaying: boolean,
   locked = false,
 ): Promise<Embed> {
-  const protocol = window.location.protocol;
-
-  if (protocol !== 'http:' && protocol !== 'https:') {
+  if (!isHttpOrigin(window.location.origin)) {
     return Promise.reject(new EmbedError('twitch-origin-blocked'));
   }
 
