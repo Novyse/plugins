@@ -6,7 +6,6 @@ import { EmbedError, type Embed, type EmbedCallbacks } from './embed';
 import { messagesFor, normalizeLocale, type Locale, type Messages } from './i18n';
 import {
   PLAYBACK,
-  PLAYER_INTENT,
   detect,
   latestPlayback,
   playbackFromEvent,
@@ -130,30 +129,30 @@ export function App() {
     });
 
     // The native player is owned by the app, which is the only side that can
-    // see a seek or a pause made with its chrome: it reports the intent as a
-    // room action, and the log is written here, where the schema lives.
-    const offPlayerIntent = sdk.action.on((event) => {
-      if (event.type !== PLAYER_INTENT) return;
+    // see a seek or a pause made with its chrome. The host reports the intent
+    // and stops there: turning it into a snapshot is our job, exactly as it is
+    // for the controls of an embed.
+    //
+    // A plugin can be newer than the app that runs it: the bridge only grows,
+    // and a missing member must not throw on every intent.
+    const player = sdk.player as {
+      onIntent?: (callback: (playing: boolean, position: number) => void) => () => void;
+    };
 
-      // Only the plugin of the user who touched the player writes the log: the
-      // action reaches the whole room, and every copy publishing it would put
-      // the same snapshot in the log once per client.
-      const self = initRef.current?.self;
-      if (!self || event.sender !== self) return;
+    const offPlayerIntent =
+      player.onIntent?.((playing: boolean, position: number) => {
+        const current = snapshotRef.current;
+        if (!current || current.source.kind !== 'file') return;
 
-      const current = snapshotRef.current;
-      if (!current || current.source.kind !== 'file') return;
+        const target = Number(position);
+        if (!Number.isFinite(target)) return;
 
-      const data = event.data as { playing?: unknown; position?: unknown } | null;
-      const position = Number(data?.position);
-      if (!Number.isFinite(position)) return;
-
-      void publish({
-        source: current.source,
-        playing: Boolean(data?.playing),
-        position: Math.max(0, position),
-      });
-    });
+        void publish({
+          source: current.source,
+          playing: Boolean(playing),
+          position: Math.max(0, target),
+        });
+      }) ?? (() => {});
 
     // The app player was closed from its back button: back to the first screen.
     const offPlayer = sdk.player.onClosed(() => {

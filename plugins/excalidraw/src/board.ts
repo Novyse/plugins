@@ -94,9 +94,6 @@ export class Board {
       for (const element of change.elements) this.remember(element);
     } else if (change.kind === 'remove') {
       for (const id of change.ids) this.sigs.delete(id);
-    } else if (change.kind === 'reset') {
-      this.sigs.clear();
-      for (const element of change.elements) this.remember(element);
     }
 
     return change;

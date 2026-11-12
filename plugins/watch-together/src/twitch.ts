@@ -126,6 +126,17 @@ function parentDomains(): string[] {
     // The referrer is not a url: nothing to declare.
   }
 
+  // A frame served from `about:srcdoc` has no host of its own: the ancestors
+  // are then the only trace of the page Twitch has to match.
+  for (const origin of Array.from(document.location.ancestorOrigins ?? [])) {
+    try {
+      const domain = new URL(origin).hostname;
+      if (domain) domains.add(domain);
+    } catch {
+      // An opaque ancestor (`null`): no domain to declare.
+    }
+  }
+
   return [...domains];
 }
 
@@ -414,6 +425,12 @@ export function createTwitch(
   initialPlaying: boolean,
   locked = false,
 ): Promise<Embed> {
+  const protocol = window.location.protocol;
+
+  if (protocol !== 'http:' && protocol !== 'https:') {
+    return Promise.reject(new EmbedError('twitch-origin-blocked'));
+  }
+
   const parents = parentDomains();
 
   if (parents.length === 0) {

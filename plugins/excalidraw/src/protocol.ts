@@ -13,23 +13,20 @@ import type { StateEvent } from '@novyse/app-sdk';
  * - `DELETE`    the ids that are gone;
  * - `APP_STATE` the part of the canvas that belongs to the room rather than to
  *               the screen: the background and the grid;
- * - `COMPACT`   a full snapshot, split in chunks, that replaces everything
- *               before it. Without it a trimmed log (`truncated: true`) would
- *               rebuild a mutilated board;
  * - `FILE`      the bytes of an image, chunked. An image element only carries a
  *               `fileId`: without its file the rectangle stays empty.
+ *
+ * There is no snapshot event: the log is the board, and a joiner folds all of
+ * it. A snapshot would be a second history, and a client that published one
+ * built from a board it believed complete could replace the room with it.
  */
 
 export const UPSERT = 'UPSERT';
 export const DELETE = 'DELETE';
 export const APP_STATE = 'APP_STATE';
-export const COMPACT = 'COMPACT';
 export const FILE = 'FILE';
 
-/** An action, not a log entry: "send me the board, I joined late". */
-export const SYNC_REQUEST = 'SYNC_REQUEST';
-
-export const EVENT_TYPES = [UPSERT, DELETE, APP_STATE, COMPACT, FILE] as const;
+export const EVENT_TYPES = [UPSERT, DELETE, APP_STATE, FILE] as const;
 
 /**
  * The part of an Excalidraw element the protocol relies on.
@@ -179,14 +176,6 @@ export type ParsedEvent =
   | { type: typeof DELETE; ids: string[] }
   | { type: typeof APP_STATE; appState: Partial<BoardAppState> }
   | {
-      type: typeof COMPACT;
-      cid: string;
-      chunk: number;
-      total: number;
-      elements: BoardElement[];
-      appState: Partial<BoardAppState> | null;
-    }
-  | {
       type: typeof FILE;
       id: string;
       mimeType: string;
@@ -231,38 +220,18 @@ export function parseEvent(event: StateEvent): ParsedEvent | null {
     return { type: FILE, id, mimeType, chunk, total, data: part, created };
   }
 
-  if (event.type === COMPACT) {
-    const cid = typeof data.cid === 'string' ? data.cid : '';
-    const chunk = typeof data.chunk === 'number' ? data.chunk : -1;
-    const total = typeof data.total === 'number' ? data.total : 0;
-    const elements = Array.isArray(data.elements) ? data.elements.filter(isBoardElement) : [];
-
-    if (!cid || chunk < 0 || total < 1 || chunk >= total) return null;
-
-    return {
-      type: COMPACT,
-      cid,
-      chunk,
-      total,
-      elements,
-      appState: parseAppState(data.appState),
-    };
-  }
-
   return null;
 }
 
 /**
  * How the log changed the board.
  *
- * `upsert` and `remove` are what the canvas has to be told about; `reset` means
- * a completed `COMPACT` replaced the whole board; `appstate` means the page
- * itself changed.
+ * `upsert` and `remove` are what the canvas has to be told about; `appstate`
+ * means the page itself changed.
  */
 export type Change =
   | { kind: 'upsert'; elements: BoardElement[] }
   | { kind: 'remove'; ids: string[] }
-  | { kind: 'reset'; elements: BoardElement[]; appState?: BoardAppState }
   | { kind: 'appstate'; appState: BoardAppState }
   | { kind: 'file'; file: BoardFile };
 
@@ -285,26 +254,19 @@ export interface Folder {
    * scene, and the next diff turns that loss into a delete for everyone.
    */
   setElements(elements: BoardElement[]): void;
-  /** Number of complete `COMPACT` events seen. */
-  compacts(): number;
 }
 
 /**
  * A log folder: the late joiner path, and the live path, with the same code.
- *
- * A partial `COMPACT` is buffered and ignored until all its chunks arrive, so a
- * snapshot interrupted by a client that left can never truncate the board.
  */
 export function createFolder(): Folder {
   const elements = new Map<string, BoardElement>();
-  const partial = new Map<string, { total: number; parts: Map<number, BoardElement[]> }>();
   const files = new Map<string, BoardFile>();
   const fileParts = new Map<
     string,
     { mimeType: string; created: number; total: number; parts: Map<number, string> }
   >();
   let appState: BoardAppState = { ...DEFAULT_APP_STATE };
-  let compactCount = 0;
 
   const applyAppState = (patch: Partial<BoardAppState> | null): Change | null => {
     if (!patch) return null;
@@ -379,32 +341,7 @@ export function createFolder(): Folder {
         return { kind: 'file', file };
       }
 
-      const entry = partial.get(parsed.cid) ?? { total: parsed.total, parts: new Map() };
-      if (entry.total !== parsed.total) return null;
-
-      entry.parts.set(parsed.chunk, parsed.elements);
-      partial.set(parsed.cid, entry);
-
-      if (entry.parts.size !== entry.total) return null;
-
-      elements.clear();
-      for (let index = 0; index < entry.total; index += 1) {
-        for (const element of entry.parts.get(index) ?? []) elements.set(element.id, element);
-      }
-
-      partial.delete(parsed.cid);
-      compactCount += 1;
-
-      // The snapshot carries the page as well: it is the state of the room at
-      // that point, and a late joiner must not have to find an `APP_STATE` that
-      // the trimming may have removed.
-      const page = applyAppState(parsed.appState);
-
-      return {
-        kind: 'reset',
-        elements: [...elements.values()],
-        ...(page ? { appState } : {}),
-      };
+      return null;
     },
 
     elements() {
@@ -426,10 +363,6 @@ export function createFolder(): Folder {
     setElements(written) {
       for (const element of written) elements.set(element.id, element);
     },
-
-    compacts() {
-      return compactCount;
-    },
   };
 }
 
@@ -438,8 +371,8 @@ export function createFolder(): Folder {
  *
  * The host measures `data` in bytes and refuses anything over 16 KiB with
  * `E_TOO_LARGE`, so the budget stays below it with room for the wrapper
- * (`{"elements":[…]}`, plus `cid`/`chunk`/`total`/`appState` on a `COMPACT`):
- * a chunk that fits here is never refused after it was measured.
+ * (`{"elements":[…]}`): a chunk that fits here is never refused after it was
+ * measured.
  */
 const MAX_CHUNK_BYTES = 12 * 1024;
 
@@ -456,9 +389,9 @@ function byteLength(value: unknown): number {
 /**
  * Splits elements into groups small enough for one `STATE` event.
  *
- * The server refuses oversized writes (`E_TOO_LARGE`), and a snapshot of a board
- * with a few thousand elements would be far over that: chunking keeps every
- * event inside the limit without guessing the exact one.
+ * The server refuses oversized writes (`E_TOO_LARGE`), and a paste of a few
+ * thousand elements would be far over that: chunking keeps every event inside
+ * the limit without guessing the exact one.
  *
  * An element that is on its own over the budget still gets a chunk of its own:
  * it cannot be split without changing the drawing, and the caller has to hear
