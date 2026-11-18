@@ -6,7 +6,7 @@ import { getAppSDK, type InitPayload, type StateEvent } from '@novyse/app-sdk';
 import { Board } from './board';
 import { messagesFor, normalizeLocale, type Locale, type Messages } from './i18n';
 import { Presence, type Viewport } from './presence';
-import { bytesToDataURL, dataURLToBytes, shrinkImage } from './image';
+import { bytesToDataURL, dataURLToBytes, shrinkImage, warmImage } from './image';
 import {
   APP_STATE,
   DEFAULT_APP_STATE,
@@ -240,6 +240,25 @@ export function App() {
 
   scheduleRenderRef.current = scheduleRender;
 
+  /**
+   * Files downloaded before the canvas existed, or while it was busy.
+   */
+  const pendingFilesRef = useRef(new Map<string, ExcalidrawFile>());
+
+  const installPendingFiles = useCallback(() => {
+    const api = apiRef.current;
+    if (!api || pendingFilesRef.current.size === 0) return;
+
+    api.addFiles([...pendingFilesRef.current.values()]);
+    pendingFilesRef.current.clear();
+
+    scheduleRenderRef.current();
+    window.setTimeout(() => scheduleRenderRef.current(), 350);
+  }, []);
+
+  const installPendingFilesRef = useRef(installPendingFiles);
+  installPendingFilesRef.current = installPendingFiles;
+
   // ----------------------------------------------------------------- protocol
 
   const flushRef = useRef<() => Promise<void>>(async () => {});
@@ -343,18 +362,20 @@ export function App() {
           if (!response.ok) throw new Error(`download failed: ${response.status}`);
 
           const bytes = new Uint8Array(await response.arrayBuffer());
+          const dataURL = bytesToDataURL(bytes, ref.mimeType);
+          await warmImage(dataURL).catch(() => {});
+
           const current = boardRef.current;
           if (!current || current.hasFile(ref.id)) return;
 
           current.markFileSent(ref.id);
-          apiRef.current?.addFiles([
-            {
-              id: ref.id,
-              mimeType: ref.mimeType,
-              dataURL: bytesToDataURL(bytes, ref.mimeType),
-              created: ref.created,
-            },
-          ]);
+          pendingFilesRef.current.set(ref.id, {
+            id: ref.id,
+            mimeType: ref.mimeType,
+            dataURL,
+            created: ref.created,
+          });
+          installPendingFilesRef.current();
         } catch (cause) {
           inflightRef.current.delete(ref.fileUUID);
           setError(describe(cause, messagesRef.current));
@@ -675,6 +696,7 @@ export function App() {
           excalidrawAPI={(api) => {
             apiRef.current = api as unknown as BoardApi;
 
+            installPendingFilesRef.current();
             renderRef.current();
             applyAppStateRef.current();
           }}
