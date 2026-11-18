@@ -50,6 +50,29 @@ so the log *is* the board. Four event types, each a complete statement:
 | `UPSERT` | `{ elements: ExcalidrawElement[] }` | the elements that changed, added or updated |
 | `DELETE` | `{ ids: string[] }` | the elements that are gone |
 | `APP_STATE` | `{ viewBackgroundColor?, gridSize? }` | the page: background and grid |
+| `FILE_REF` | `{ fileUUID, id, mimeType, size, created }` | the reference of an image, not its bytes |
+
+### Images travel on the `file` channel, not in the log
+
+An image element only carries a `fileId`; the bytes live in Excalidraw's file
+store, and the manifest declares the `file` channel for them. The flow per
+image, in `pushFiles`:
+
+1. downscale to 5 MB (`shrinkImage`), so a photo is not a 30 MB upload;
+2. `sdk.file.upload(name, mimeType, size)` → the direct S3 `uploadURL`;
+3. `PUT` the bytes there, then `sdk.file.confirm(fileUUID)`;
+4. `STATE` gets only the `FILE_REF` above — a few dozen bytes, replay-safe.
+
+The other side (`downloadRef`) fetches the bytes through
+`sdk.file.download(fileUUID)` and installs the `data:` URL on the canvas.
+Downloads of the same file collapse onto one request, and a late joiner
+fetches every `FILE_REF` the folder kept right after `init()`. Files die with
+the activity, so no cleanup code exists here: stop the activity and the server
+sweeps the rows, the S3 objects and the pointers.
+
+Under `vite` there is no S3 — the development host answers `devfile://` urls
+and keeps the bytes in memory, broadcasting them to the other tabs on
+`confirm`, so two tabs still share images.
 
 Add and update are one event because Excalidraw versions its elements: two
 clients editing the same one are resolved with their own rule, higher `version`
@@ -137,10 +160,5 @@ that size is what a client downloads once.
 
 ## Still open
 
-- **Files**: an image element references a `fileId`, and the bytes are not in
-  the element. `onChange` exposes them as `BinaryFiles`; sending them through
-  the `STATE` log would mean base64 in a log that gets trimmed, so the right
-  place is a separate store. Until then an image stays on the device that added
-  it.
 - **Text measurement**: a font subset missing from the bundle changes the width
   of text in the CJK family only, and the board falls back to a system font.

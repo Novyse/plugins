@@ -2,7 +2,7 @@
   "id": "excalidraw",
   "name": "Excalidraw",
   "description": "A shared Excalidraw whiteboard, one per voice room: everyone draws on the same board, every stroke in sync.",
-  "version": "0.1.9",
+  "version": "0.2.0",
   "author": {
     "name": "Novyse",
     "url": "https://github.com/Novyse"
@@ -18,7 +18,8 @@
     "channels": [
       "state",
       "action",
-      "stream"
+      "stream",
+      "file"
     ]
   }
 }
