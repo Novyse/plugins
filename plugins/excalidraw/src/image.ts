@@ -60,6 +60,74 @@ function load(dataURL: string): Promise<HTMLImageElement | null> {
 }
 
 /**
+ * Decodes an image so the later `addFiles` paints on the first frame.
+ *
+ * Excalidraw warms its own image cache asynchronously: installing a cold file
+ * can paint an empty rectangle with no further event to retrigger it, the
+ * late joiner that only sees the image after nudging it. Awaiting this first
+ * (and again after installing) makes the first `addFiles` frame hit warm.
+ */
+export function warmImage(dataURL: string, timeoutMs = 5000): Promise<void> {
+  return new Promise((resolve) => {
+    let done = false;
+    const finish = () => {
+      if (!done) {
+        done = true;
+        resolve();
+      }
+    };
+
+    const timer = window.setTimeout(finish, timeoutMs);
+    const image = new Image();
+    image.onload = () => {
+      window.clearTimeout(timer);
+      // Hold one frame: some engines decode lazily and report `load` before
+      // the bitmap is paintable. The extra frame costs nothing on the fast
+      // path and saves the late joiner an empty rectangle.
+      requestAnimationFrame(() => finish());
+    };
+    image.onerror = () => {
+      window.clearTimeout(timer);
+      finish();
+    };
+    image.src = dataURL;
+  });
+}
+
+/**
+ * Re-encodes a raster image through a canvas at its natural size.
+ *
+ * Files pasted into the board keep whatever the OS or camera wrote: exotic
+ * color profiles or CMYK JPEGs that desktop WebViews decode differently from
+ * browsers (the "inverted colors on Linux" report). A canvas roundtrip
+ * normalizes to sRGB exactly as the local screen drew it, so every engine
+ * decodes the same bytes. Returns `null` when the image cannot be decoded.
+ */
+export async function normalizeImage(
+  dataURL: string,
+): Promise<{ dataURL: string; mimeType: string } | null> {
+  const mimeType = /^data:([^;,]+)/.exec(dataURL)?.[1] ?? 'image/png';
+  if (mimeType.includes('svg')) return { dataURL, mimeType };
+
+  const image = await load(dataURL);
+  if (!image || image.width === 0 || image.height === 0) return null;
+
+  const canvas = document.createElement('canvas');
+  canvas.width = image.naturalWidth || image.width;
+  canvas.height = image.naturalHeight || image.height;
+
+  const context = canvas.getContext('2d');
+  if (!context) return null;
+
+  context.drawImage(image, 0, 0, canvas.width, canvas.height);
+
+  // PNG keeps transparency and is lossless: the bytes change (sRGB, stripped
+  // profile) but the pixels do not. JPEG/WebP only enter in the downscale
+  // loop below, when the PNG no longer fits.
+  return { dataURL: canvas.toDataURL('image/png'), mimeType: 'image/png' };
+}
+
+/**
  * The image at no more than [maxBytes], downscaled and re-encoded when needed.
  *
  * Returns `null` when it cannot be brought under the ceiling: the caller leaves
@@ -77,9 +145,12 @@ export async function shrinkImage(
     return binaryBytes(dataURL) <= maxBytes ? { dataURL, mimeType } : null;
   }
 
-  if (binaryBytes(dataURL) <= maxBytes) return { dataURL, mimeType };
+  const normalized = await normalizeImage(dataURL);
+  if (!normalized) return null;
 
-  const image = await load(dataURL);
+  if (binaryBytes(normalized.dataURL) <= maxBytes) return normalized;
+
+  const image = await load(normalized.dataURL);
   if (!image || image.width === 0 || image.height === 0) return null;
 
   let scale = Math.min(1, MAX_SIDE / Math.max(image.width, image.height));
