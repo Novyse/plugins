@@ -91,10 +91,10 @@
         "channels": {
           "type": "array",
           "uniqueItems": true,
-          "maxItems": 3,
-          "description": "Communication channels the plugin writes to: `state` (persistent log), `action` (transient, not replayed), `stream` (lossy WebRTC). The app refuses a write on a channel the manifest does not declare.",
+          "maxItems": 4,
+          "description": "Communication channels the plugin writes to: `state` (persistent log), `action` (transient, not replayed), `stream` (lossy WebRTC), `file` (temp S3 files). The app refuses a write on a channel the manifest does not declare.",
           "items": {
-            "enum": ["state", "action", "stream"]
+            "enum": ["state", "action", "stream", "file"]
           }
         },
         "frame": {

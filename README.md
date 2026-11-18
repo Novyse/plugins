@@ -90,7 +90,7 @@ app can show them before a plugin is installed.
 | Field | Values | Meaning |
 | :--- | :--- | :--- |
 | `capabilities` | `stream`, `fullscreen`, `network` | Host features. `stream` gates `sdk.stream.send` (the app refuses it otherwise); `fullscreen` gates `ui.requestFullscreen`; `network` declares resources loaded from outside the sandbox, whose allowlist is `permissions.frame`. Empty is valid and means none. |
-| `permissions.channels` | `state`, `action`, `stream` | The communication channels the plugin writes to. Required: the app refuses a write on a channel that is not listed. |
+| `permissions.channels` | `state`, `action`, `stream`, `file` | The communication channels the plugin writes to. Required: the app refuses a write on a channel that is not listed. |
 | `permissions.frame` | `https://host`, `https://*.host`, with an optional port | Origins the plugin loads into an iframe. No path, no query, https only; at most 8. |
 
 ```json
@@ -102,6 +102,32 @@ app can show them before a plugin is installed.
   }
 }
 ```
+
+## Big files go on `file`, never on `state`
+
+A `STATE` event is 16 KiB: anything bigger, a photo, a recording, a document,
+would mean hundreds of chunked events kept in the log of the room until it is
+trimmed. Declare the `file` channel instead and let the bytes travel outside
+the log, straight to S3:
+
+1. `sdk.file.upload(name, mimeType, size)` reserves the file on the quota of
+   the user uploading and returns a direct S3 `uploadURL` (presigned PUT, 24 h).
+2. the plugin `PUT`s the bytes there itself, with `Content-Type: <mimeType>`;
+   nothing crosses the app or Redis, so the log stays small;
+3. `sdk.file.confirm(fileUUID)` makes the file downloadable — the server
+   verifies the object exists before confirming;
+4. the plugin publishes a `STATE` event carrying only the reference
+   (`{ fileUUID, … }`), which is all a late joiner needs;
+5. whoever needs the bytes calls `sdk.file.download(fileUUID)` and `GET`s the
+   presigned URL (1 h). Any participant of the chat can download; only the
+   uploader can confirm, and only a writer can upload or remove.
+
+Files are temporary and quota-checked: up to 50 MiB each, charged to the
+storage of the uploader (507 when full, 413 when over the cap), and deleted
+with the activity, stop the activity and the rows, the S3 objects and the
+Redis pointers go away. `sdk.file.remove(fileUUID)` deletes one early.
+Excalidraw is the reference: its images travel exactly this way (`FILE_REF`
+events over `STATE`).
 
 Keep the lists honest: `scripts/validate-registry.mjs` checks that they are
 well formed and that `registry.json` mirrors them, but only the code review can
