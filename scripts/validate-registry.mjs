@@ -16,7 +16,7 @@ const VERSION = /^(0|[1-9][0-9]*)\.(0|[1-9][0-9]*)\.(0|[1-9][0-9]*)$/;
 const SHA256 = /^[a-f0-9]{64}$/;
 const MIN_APP = /^[0-9]+\.[0-9]+\.[0-9]+-[0-9]{8}\.[0-9]+$/;
 const CAPABILITIES = new Set(['stream', 'fullscreen', 'network']);
-const CHANNELS = new Set(['state', 'action', 'stream']);
+const CHANNELS = new Set(['state', 'action', 'stream', 'file']);
 const LOCALE = /^[a-z]{2,3}(-[A-Z][a-z]{3})?(-[A-Z]{2})?$/;
 
 const problems = [];

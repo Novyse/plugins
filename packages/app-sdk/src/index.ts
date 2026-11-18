@@ -168,6 +168,21 @@ export interface AppSDK {
     delete(key: string): Promise<void>;
   };
 
+  /**
+   * Temporary S3 files of the activity
+   *
+   * The bytes never cross Redis: `upload` reserves the file on your quota and
+   * returns the direct S3 `uploadURL`, the plugin PUTs there, then `confirm`
+   * makes it downloadable. `STATE` carries only `{fileUUID,name,size,mimeType}`.
+   * Files die with the activity (stop / room empty)
+   */
+  file: {
+    upload(name: string, mimeType: string, size: number): Promise<{ fileUUID: string; uploadURL: string; expiresAt: string }>;
+    confirm(fileUUID: string): Promise<void>;
+    download(fileUUID: string): Promise<{ downloadURL: string; name: string; size: number; mimeType: string }>;
+    remove(fileUUID: string): Promise<void>;
+  };
+
   log(level: 'debug' | 'info' | 'warn' | 'error', ...args: unknown[]): void;
 }
 

@@ -20,7 +20,10 @@
  * - the server is the authority: here `seq` is `max(known) + 1` and `ts` is the
  *   local clock, so concurrent senders can interleave differently than on the
  *   real server. Do not build logic on the ordering between two senders;
- * - the caps (16/4/8 KiB) are not enforced.
+ * - the caps (16/4/8 KiB) are not enforced;
+ * - S3 is memory: `file` keeps the bytes of this tab (and of the tabs that
+ *   confirmed while this one was open) instead of a bucket, so a file uploaded
+ *   before a tab opens is not there for it, reload the uploader instead.
  */
 import type { ActionEvent, AppSDK, InitPayload, StateEvent, Uuid } from './index';
 
@@ -45,7 +48,15 @@ type Message =
   | { kind: 'action'; sender: Uuid; type: string; data: unknown }
   | { kind: 'stream'; sender: Uuid; bytes: Uint8Array }
   | { kind: 'hello'; sender: Uuid }
-  | { kind: 'sync'; sender: Uuid; events: StateEvent[] };
+  | { kind: 'sync'; sender: Uuid; events: StateEvent[] }
+  | {
+      kind: 'file';
+      sender: Uuid;
+      fileUUID: string;
+      name: string;
+      mimeType: string;
+      bytes: Uint8Array;
+    };
 
 /** Installs the fake host, unless a real one is already there. */
 export function installDevHost(options: DevHostOptions): void {
@@ -67,6 +78,30 @@ export function installDevHost(options: DevHostOptions): void {
   let events: StateEvent[] = [];
   let initPromise: Promise<InitPayload> | null = null;
   const storagePrefix = `novyse-dev:${options.slug}:`;
+
+  const devFiles = new Map<
+    string,
+    { name: string; mimeType: string; bytes: Uint8Array; confirmed: boolean }
+  >();
+  const devPending = new Map<string, { name: string; mimeType: string }>();
+
+  (window as unknown as { __novyseDevFilePut?: unknown }).__novyseDevFilePut = async (
+    uploadURL: string,
+    bytes: Uint8Array,
+    mimeType: string,
+  ) => {
+    const fileUUID = uploadURL.replace(/^devfile:\/\//, '');
+    const pending = devPending.get(fileUUID);
+    if (!pending) throw new Error('Unknown upload');
+
+    devPending.delete(fileUUID);
+    devFiles.set(fileUUID, {
+      name: pending.name,
+      mimeType: mimeType || pending.mimeType,
+      bytes,
+      confirmed: false,
+    });
+  };
 
   const merge = (incoming: StateEvent[]) => {
     const known = new Set(events.map((event) => `${event.sender}:${event.seq}`));
@@ -105,6 +140,17 @@ export function installDevHost(options: DevHostOptions): void {
       case 'stream':
         for (const listener of streamListeners) {
           listener(payload.sender, payload.bytes);
+        }
+        break;
+
+      case 'file':
+        if (payload.sender !== self) {
+          devFiles.set(payload.fileUUID, {
+            name: payload.name,
+            mimeType: payload.mimeType,
+            bytes: payload.bytes,
+            confirmed: true,
+          });
         }
         break;
     }
@@ -280,6 +326,62 @@ export function installDevHost(options: DevHostOptions): void {
       },
       async delete(key) {
         localStorage.removeItem(storagePrefix + key);
+      },
+    },
+
+    file: {
+      async upload(name, mimeType, size) {
+        if (!name || !mimeType || !Number.isFinite(size) || size < 1) {
+          throw Object.assign(new Error('No file metadata'), { code: 'E_INTERNAL' as const });
+        }
+
+        const fileUUID = `dev-${randomSuffix()}${randomSuffix()}`;
+        devPending.set(fileUUID, { name, mimeType });
+
+        return {
+          fileUUID,
+          uploadURL: `devfile://${fileUUID}`,
+          expiresAt: new Date(Date.now() + 24 * 3_600_000).toISOString(),
+        };
+      },
+
+      async confirm(fileUUID) {
+        const record = devFiles.get(fileUUID);
+        if (!record) {
+          throw Object.assign(new Error('Nothing was uploaded'), { code: 'E_INTERNAL' as const });
+        }
+
+        record.confirmed = true;
+        channel.postMessage({
+          kind: 'file',
+          sender: self,
+          fileUUID,
+          name: record.name,
+          mimeType: record.mimeType,
+          bytes: record.bytes,
+        } satisfies Message);
+      },
+
+      async download(fileUUID) {
+        const record = devFiles.get(fileUUID);
+        if (!record || !record.confirmed) {
+          throw Object.assign(new Error('Gone'), { code: 'E_NOT_FOUND' as const });
+        }
+
+        const downloadURL = URL.createObjectURL(
+          new Blob([record.bytes as unknown as BlobPart], { type: record.mimeType }),
+        );
+
+        return {
+          downloadURL,
+          name: record.name,
+          size: record.bytes.length,
+          mimeType: record.mimeType,
+        };
+      },
+
+      async remove(fileUUID) {
+        devFiles.delete(fileUUID);
       },
     },
 
