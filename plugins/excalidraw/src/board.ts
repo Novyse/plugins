@@ -5,7 +5,7 @@ import {
   signature,
   type BoardAppState,
   type BoardElement,
-  type BoardFile,
+  type BoardFileRef,
   type Change,
   type Folder,
 } from './protocol';
@@ -49,10 +49,6 @@ export class Board {
     const board = new Board(folder);
     for (const element of folder.elements()) board.remember(element);
 
-    // The bytes were in the log too: the room has them, and re-sending them
-    // would put a second copy of every image on the wire.
-    for (const file of folder.files()) board.markFileSent(file.id);
-
     return board;
   }
 
@@ -60,9 +56,9 @@ export class Board {
     return this.files.has(id);
   }
 
-  /** The image bytes the log carried: what a late joiner has to install. */
-  imageFiles(): BoardFile[] {
-    return this.folder.files();
+  /** The image references the log carries: what a late joiner has to download. */
+  fileRefs(): BoardFileRef[] {
+    return this.folder.fileRefs();
   }
 
   markFileSent(id: string): void {

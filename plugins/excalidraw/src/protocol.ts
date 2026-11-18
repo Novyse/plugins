@@ -13,8 +13,11 @@ import type { StateEvent } from '@novyse/app-sdk';
  * - `DELETE`    the ids that are gone;
  * - `APP_STATE` the part of the canvas that belongs to the room rather than to
  *               the screen: the background and the grid;
- * - `FILE`      the bytes of an image, chunked. An image element only carries a
- *               `fileId`: without its file the rectangle stays empty.
+ * - `FILE_REF`  the reference of an image, not its bytes. The bytes travel on
+ *               the `file` channel (S3, presigned URLs) and the log carries
+ *               only `{ fileUUID, id, mimeType, size }`: an image element only
+ *               carries a `fileId`, and without its file the rectangle stays
+ *               empty.
  *
  * There is no snapshot event: the log is the board, and a joiner folds all of
  * it. A snapshot would be a second history, and a client that published one
@@ -24,9 +27,9 @@ import type { StateEvent } from '@novyse/app-sdk';
 export const UPSERT = 'UPSERT';
 export const DELETE = 'DELETE';
 export const APP_STATE = 'APP_STATE';
-export const FILE = 'FILE';
+export const FILE_REF = 'FILE_REF';
 
-export const EVENT_TYPES = [UPSERT, DELETE, APP_STATE, FILE] as const;
+export const EVENT_TYPES = [UPSERT, DELETE, APP_STATE, FILE_REF] as const;
 
 /**
  * The part of an Excalidraw element the protocol relies on.
@@ -76,13 +79,23 @@ export interface BoardAppState {
   gridSize: number | null;
 }
 
-/** One image of the board, as Excalidraw's file store holds it. */
-export interface BoardFile {
+/**
+ * How an image travels now: a pointer, not the bytes.
+ *
+ * The bytes live in the temporary `file` store of the activity (S3) and die
+ * with it; the log holds this reference, which is all a late joiner needs to
+ * download them. `id` is the `fileId` of the Excalidraw image element.
+ */
+export interface BoardFileRef {
+  fileUUID: string;
   id: string;
   mimeType: string;
-  dataURL: string;
+  size: number;
   created: number;
 }
+
+/** Ceiling the host enforces on one temporary plugin file, in bytes. */
+export const MAX_PLUGIN_FILE_BYTES = 50 * 1024 * 1024;
 
 export const DEFAULT_APP_STATE: BoardAppState = {
   viewBackgroundColor: '#ffffff',
@@ -172,15 +185,7 @@ export type ParsedEvent =
   | { type: typeof UPSERT; elements: BoardElement[] }
   | { type: typeof DELETE; ids: string[] }
   | { type: typeof APP_STATE; appState: Partial<BoardAppState> }
-  | {
-      type: typeof FILE;
-      id: string;
-      mimeType: string;
-      chunk: number;
-      total: number;
-      data: string;
-      created: number;
-    };
+  | { type: typeof FILE_REF; ref: BoardFileRef };
 
 /** One event from the wire, or `null` if it is not a board event we can trust. */
 export function parseEvent(event: StateEvent): ParsedEvent | null {
@@ -204,17 +209,17 @@ export function parseEvent(event: StateEvent): ParsedEvent | null {
     return appState ? { type: APP_STATE, appState } : null;
   }
 
-  if (event.type === FILE) {
+  if (event.type === FILE_REF) {
+    const fileUUID = typeof data.fileUUID === 'string' ? data.fileUUID : '';
     const id = typeof data.id === 'string' ? data.id : '';
     const mimeType = typeof data.mimeType === 'string' ? data.mimeType : '';
-    const chunk = typeof data.chunk === 'number' ? data.chunk : -1;
-    const total = typeof data.total === 'number' ? data.total : 0;
-    const part = typeof data.data === 'string' ? data.data : '';
+    const size = typeof data.size === 'number' ? data.size : 0;
     const created = typeof data.created === 'number' ? data.created : 0;
 
-    if (!id || !mimeType || chunk < 0 || total < 1 || chunk >= total) return null;
+    if (!fileUUID || !id || !mimeType) return null;
+    if (!Number.isFinite(size) || size < 1 || size > MAX_PLUGIN_FILE_BYTES) return null;
 
-    return { type: FILE, id, mimeType, chunk, total, data: part, created };
+    return { type: FILE_REF, ref: { fileUUID, id, mimeType, size, created } };
   }
 
   return null;
@@ -230,15 +235,15 @@ export type Change =
   | { kind: 'upsert'; elements: BoardElement[] }
   | { kind: 'remove'; ids: string[] }
   | { kind: 'appstate'; appState: BoardAppState }
-  | { kind: 'file'; file: BoardFile };
+  | { kind: 'fileref'; ref: BoardFileRef };
 
 export interface Folder {
   /** Folds one event. Returns what changed, or `null`. */
   apply(event: StateEvent): Change | null;
   /** The board as folded so far, oldest element first. */
   elements(): BoardElement[];
-  /** The image bytes the log carried, for a late joiner to install. */
-  files(): BoardFile[];
+  /** The image references the log carries: what a late joiner has to download. */
+  fileRefs(): BoardFileRef[];
   /** The shared page: background and grid. */
   appState(): BoardAppState;
   /** Records a local write, so it is not published again on the next diff. */
@@ -258,12 +263,9 @@ export interface Folder {
  */
 export function createFolder(): Folder {
   const elements = new Map<string, BoardElement>();
-  const files = new Map<string, BoardFile>();
-  const fileParts = new Map<
-    string,
-    { mimeType: string; created: number; total: number; parts: Map<number, string> }
-  >();
   let appState: BoardAppState = { ...DEFAULT_APP_STATE };
+
+  const refs = new Map<string, BoardFileRef>();
 
   const applyAppState = (patch: Partial<BoardAppState> | null): Change | null => {
     if (!patch) return null;
@@ -302,40 +304,14 @@ export function createFolder(): Folder {
 
       if (parsed.type === APP_STATE) return applyAppState(parsed.appState);
 
-      if (parsed.type === FILE) {
-        if (files.has(parsed.id)) return null;
+      if (parsed.type === FILE_REF) {
+        // The bytes are not here: the reference is the whole payload, and the
+        // image is downloaded on demand. A duplicate carries nothing new.
+        if (refs.has(parsed.ref.fileUUID)) return null;
 
-        const entry = fileParts.get(parsed.id) ?? {
-          mimeType: parsed.mimeType,
-          created: parsed.created,
-          total: parsed.total,
-          parts: new Map<number, string>(),
-        };
+        refs.set(parsed.ref.fileUUID, parsed.ref);
 
-        if (entry.total !== parsed.total) return null;
-
-        entry.parts.set(parsed.chunk, parsed.data);
-        fileParts.set(parsed.id, entry);
-
-        if (entry.parts.size !== entry.total) return null;
-
-        let encoded = '';
-        for (let index = 0; index < entry.total; index += 1) {
-          encoded += entry.parts.get(index) ?? '';
-        }
-
-        fileParts.delete(parsed.id);
-
-        const file: BoardFile = {
-          id: parsed.id,
-          mimeType: entry.mimeType,
-          dataURL: `data:${entry.mimeType};base64,${encoded}`,
-          created: entry.created,
-        };
-
-        files.set(parsed.id, file);
-
-        return { kind: 'file', file };
+        return { kind: 'fileref', ref: parsed.ref };
       }
 
       return null;
@@ -345,8 +321,8 @@ export function createFolder(): Folder {
       return [...elements.values()];
     },
 
-    files() {
-      return [...files.values()];
+    fileRefs() {
+      return [...refs.values()];
     },
 
     appState() {

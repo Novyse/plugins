@@ -6,21 +6,30 @@ import { getAppSDK, type InitPayload, type StateEvent } from '@novyse/app-sdk';
 import { Board } from './board';
 import { messagesFor, normalizeLocale, type Locale, type Messages } from './i18n';
 import { Presence, type Viewport } from './presence';
-import { shrinkImage } from './image';
+import { bytesToDataURL, dataURLToBytes, shrinkImage } from './image';
 import {
   APP_STATE,
   DEFAULT_APP_STATE,
   DELETE,
   EVENT_TYPES,
-  FILE,
+  FILE_REF,
+  MAX_PLUGIN_FILE_BYTES,
   UPSERT,
   chunkElements,
   chunkIds,
   createFolder,
   type BoardAppState,
   type BoardElement,
-  type BoardFile,
+  type BoardFileRef,
 } from './protocol';
+
+/** One image, as Excalidraw's file store holds it. */
+interface ExcalidrawFile {
+  id: string;
+  mimeType: string;
+  dataURL: string;
+  created: number;
+}
 
 /** Debounce of the local diff: a drag is many changes, one write. */
 const FLUSH_MS = 150;
@@ -30,11 +39,12 @@ const FLUSH_MS = 150;
  */
 const PREVIEW_MS = 50;
 
-/** Ceiling of one image on the wire, in bytes, once downscaled. */
-const MAX_FILE_BYTES = 300 * 1024;
-
-/** Base64 characters per `FILE` event: ~6 KiB, well inside one `STATE`. */
-const FILE_CHUNK_CHARS = 8_000;
+/** Ceiling of one image before the upload, in bytes, once downscaled.
+ *
+ * The `file` channel takes up to 50 MiB per file, so this is a quality choice,
+ * not a wire budget: a photo is downscaled to 5 MB, which the log never sees.
+ */
+const MAX_FILE_BYTES = 5 * 1024 * 1024;
 
 /**
  * The slice of Excalidraw's imperative API this board uses.
@@ -50,8 +60,8 @@ interface BoardApi {
     elements?: BoardElement[];
     appState?: Partial<BoardAppState>;
   }): void;
-  getFiles(): Record<string, BoardFile>;
-  addFiles(files: BoardFile[]): void;
+  getFiles(): Record<string, ExcalidrawFile>;
+  addFiles(files: ExcalidrawFile[]): void;
 }
 
 interface ContainerState {
@@ -144,7 +154,7 @@ export function App() {
    *
    * Everything the board knows keeps the object it already has, so a remote
    * update cannot cancel a drag in progress. The elements only this screen has
-   * — the stroke under the mouse — are appended as they are: replacing them
+   *, the stroke under the mouse, are appended as they are: replacing them
    * would delete the line being drawn. The gestures of the room are not here at
    * all: `presence` draws them, as strokes, in its own overlay.
    */
@@ -239,63 +249,129 @@ export function App() {
    * Publishes the images the room does not have yet.
    *
    * An image element only carries a `fileId`; the bytes live in Excalidraw's
-   * file store. Without them a late joiner draws an empty rectangle, so the file
-   * travels too — downscaled and chunked, because one `STATE` event is 16 KiB
-   * and a screenshot is not.
+   * file store. Without them a late joiner draws an empty rectangle, so the
+   * file travels too, over the `file` channel, never over the log: `upload`
+   * reserves the file on the uploader's quota and returns the direct S3
+   * `uploadURL`, the bytes are PUT there, `confirm` makes them downloadable,
+   * and the log carries only the `FILE_REF` pointer a joiner downloads from.
    */
-  const pushFiles = useCallback(
-    async () => {
-      const api = apiRef.current;
-      const board = boardRef.current;
-      if (!api || !board) return;
+  const pushFiles = useCallback(async () => {
+    const api = apiRef.current;
+    const board = boardRef.current;
+    if (!api || !board) return;
 
-      const referenced = new Set<string>();
+    const referenced = new Set<string>();
 
-      for (const element of board.elements()) {
-        if (element.type !== 'image') continue;
-        if (typeof element.fileId === 'string') referenced.add(element.fileId);
-      }
+    for (const element of board.elements()) {
+      if (element.type !== 'image') continue;
+      if (typeof element.fileId === 'string') referenced.add(element.fileId);
+    }
 
-      if (referenced.size === 0) return;
+    if (referenced.size === 0) return;
 
-      const files = api.getFiles();
+    const files = api.getFiles();
 
-      for (const id of referenced) {
-        if (board.hasFile(id)) continue;
+    for (const id of referenced) {
+      if (board.hasFile(id)) continue;
 
-        const file = files[id];
-        if (!file || typeof file.dataURL !== 'string' || file.dataURL.length === 0) continue;
+      const file = files[id];
+      if (!file || typeof file.dataURL !== 'string' || file.dataURL.length === 0) continue;
 
-        const prepared = await shrinkImage(file.dataURL, MAX_FILE_BYTES);
-        if (!prepared) {
-          setError(messagesRef.current.imageTooBig);
-          board.markFileSent(id);
-          continue;
-        }
-
-        const encoded = prepared.dataURL.slice(prepared.dataURL.indexOf(',') + 1);
-        const total = Math.max(1, Math.ceil(encoded.length / FILE_CHUNK_CHARS));
-        const created = typeof file.created === 'number' && file.created > 0 ? file.created : Date.now();
-
-        for (let chunk = 0; chunk < total; chunk += 1) {
-          await sdk.state.send(FILE, {
-            id,
-            mimeType: prepared.mimeType,
-            created,
-            chunk,
-            total,
-            data: encoded.slice(chunk * FILE_CHUNK_CHARS, (chunk + 1) * FILE_CHUNK_CHARS),
-          });
-        }
-
+      const prepared = await shrinkImage(file.dataURL, MAX_FILE_BYTES);
+      if (!prepared) {
+        setError(messagesRef.current.imageTooBig);
         board.markFileSent(id);
+        continue;
       }
+
+      const raw = dataURLToBytes(prepared.dataURL);
+      if (!raw || raw.bytes.length === 0 || raw.bytes.length > MAX_PLUGIN_FILE_BYTES) {
+        setError(messagesRef.current.imageTooBig);
+        board.markFileSent(id);
+        continue;
+      }
+
+      const created =
+        typeof file.created === 'number' && file.created > 0 ? file.created : Date.now();
+
+      try {
+        const reserved = await sdk.file.upload(fileNameOf(id, raw.mimeType), raw.mimeType, raw.bytes.length);
+        await putBytes(reserved.uploadURL, raw.bytes, raw.mimeType);
+        await sdk.file.confirm(reserved.fileUUID);
+        await sdk.state.send(FILE_REF, {
+          fileUUID: reserved.fileUUID,
+          id,
+          mimeType: raw.mimeType,
+          size: raw.bytes.length,
+          created,
+        });
+      } catch (cause) {
+        setError(describe(cause, messagesRef.current));
+      }
+
+      board.markFileSent(id);
+    }
+  }, [sdk]);
+
+  const pushFilesRef = useRef(pushFiles);
+  pushFilesRef.current = pushFiles;
+
+  /**
+   * Downloads the bytes a `FILE_REF` points at and installs them on the canvas.
+   *
+   * The copy that comes back to its own author is skipped: the screen that
+   * added the image already has the file. Downloads of the same file collapse
+   * onto one request, so a `FILE_REF` replayed to a joiner is fetched once.
+   */
+  const inflightRef = useRef(new Map<string, Promise<void>>());
+
+  const downloadRef = useCallback(
+    (ref: BoardFileRef) => {
+      const board = boardRef.current;
+      if (!board || board.hasFile(ref.id)) return;
+
+      const known = inflightRef.current.get(ref.fileUUID);
+      if (known) {
+        void known.then(() => scheduleRenderRef.current());
+        return;
+      }
+
+      const task = (async () => {
+        try {
+          const got = await sdk.file.download(ref.fileUUID);
+          const response = await fetch(got.downloadURL);
+          if (!response.ok) throw new Error(`download failed: ${response.status}`);
+
+          const bytes = new Uint8Array(await response.arrayBuffer());
+          const current = boardRef.current;
+          if (!current || current.hasFile(ref.id)) return;
+
+          current.markFileSent(ref.id);
+          apiRef.current?.addFiles([
+            {
+              id: ref.id,
+              mimeType: ref.mimeType,
+              dataURL: bytesToDataURL(bytes, ref.mimeType),
+              created: ref.created,
+            },
+          ]);
+        } catch (cause) {
+          inflightRef.current.delete(ref.fileUUID);
+          setError(describe(cause, messagesRef.current));
+          throw cause;
+        }
+
+        inflightRef.current.delete(ref.fileUUID);
+      })();
+
+      inflightRef.current.set(ref.fileUUID, task);
+      void task.then(() => scheduleRenderRef.current()).catch(() => {});
     },
     [sdk],
   );
 
-  const pushFilesRef = useRef(pushFiles);
-  pushFilesRef.current = pushFiles;
+  const downloadRefRef = useRef(downloadRef);
+  downloadRefRef.current = downloadRef;
 
   const flush = useCallback(async () => {
     if (!aliveRef.current) return;
@@ -399,7 +475,7 @@ export function App() {
   /**
    * Publishes the elements the local hand is still moving.
    *
-   * Same comparison as [flush] — the scene against what the room knows — but
+   * Same comparison as [flush], the scene against what the room knows, but
    * over `STREAM`, and without marking anything as sent: the log is written
    * once, when the gesture ends.
    */
@@ -471,16 +547,13 @@ export function App() {
 
     if (change?.kind === 'appstate') {
       applyAppStateRef.current();
-    } else if (change?.kind === 'file') {
-      // The bytes are what make the image visible: install them, then redraw.
-      // The copy that comes back to its own author is the re-encoded one that
-      // travelled, and the screen that added the image already has the file.
+    } else if (change?.kind === 'fileref') {
+      // The bytes are what make the image visible: download them, then redraw.
+      // The echo to the author carries nothing new: the screen that added the
+      // image already has the file, and `pushFiles` marked it as sent.
       if (event.sender !== initRef.current?.self) {
-        apiRef.current?.addFiles([change.file]);
-        // The room has these bytes now: they are not re-sent on the next diff.
-        board.markFileSent(change.file.id);
+        downloadRefRef.current(change.ref);
       }
-      scheduleRender();
     } else if (change) {
       scheduleRender();
     }
@@ -519,21 +592,20 @@ export function App() {
         // The first scene of the canvas is the board, handed over as
         // `initialData`: it is the only scene Excalidraw is guaranteed to keep.
         // An `updateScene` issued from `excalidrawAPI` lands while the canvas is
-        // still being created, and the empty scene it mounts from wins — which
+        // still being created, and the empty scene it mounts from wins, which
         // is why a joiner saw an empty board until the next redraw (a remote
         // echo, or a gesture of their own) pushed the elements again.
         initialSceneRef.current = {
           elements: board.elements(),
           appState: board.appState(),
-          files: Object.fromEntries(
-            board.imageFiles().map((file) => [file.id, file]),
-          ),
         } as unknown as InitialScene;
 
         lastSeqRef.current = payload.state.seq;
         participantsRef.current = payload.participants;
         readOnlyRef.current = payload.readOnly;
         readyRef.current = true;
+
+        for (const ref of board.fileRefs()) downloadRefRef.current(ref);
 
         setInit(payload);
         setLocale(normalizeLocale(payload.locale));
@@ -603,9 +675,6 @@ export function App() {
           excalidrawAPI={(api) => {
             apiRef.current = api as unknown as BoardApi;
 
-            const files = boardRef.current?.imageFiles() ?? [];
-            if (files.length > 0) apiRef.current.addFiles(files);
-
             renderRef.current();
             applyAppStateRef.current();
           }}
@@ -637,6 +706,53 @@ export function App() {
       ) : null}
     </main>
   );
+}
+
+/** File name of an image upload: the id plus the extension of its mime type. */
+function fileNameOf(id: string, mimeType: string): string {
+  const extension =
+    mimeType === 'image/jpeg'
+      ? 'jpg'
+      : mimeType === 'image/webp'
+        ? 'webp'
+        : mimeType === 'image/png'
+          ? 'png'
+          : mimeType.includes('svg')
+            ? 'svg'
+            : 'bin';
+
+  return `${id}.${extension}`;
+}
+
+/**
+ * PUTs the bytes at the presigned S3 url.
+ *
+ * Under `vite` there is no S3: the development host answers `devfile://`
+ * urls, whose bytes go through `window.__novyseDevFilePut` into the fake
+ * store of that tab instead. The build drops nothing here, the branch only
+ * triggers on a url the real host never returns.
+ */
+async function putBytes(uploadURL: string, bytes: Uint8Array, mimeType: string): Promise<void> {
+  if (uploadURL.startsWith('devfile://')) {
+    const put = (window as unknown as { __novyseDevFilePut?: unknown }).__novyseDevFilePut;
+    if (typeof put !== 'function') throw new Error('The development host is missing its file store');
+
+    await (put as (url: string, bytes: Uint8Array, mimeType: string) => Promise<void>)(
+      uploadURL,
+      bytes,
+      mimeType,
+    );
+
+    return;
+  }
+
+  const response = await fetch(uploadURL, {
+    method: 'PUT',
+    headers: { 'Content-Type': mimeType },
+    body: new Blob([bytes as unknown as BlobPart], { type: mimeType }),
+  });
+
+  if (!response.ok) throw new Error(`upload failed: ${response.status}`);
 }
 
 function describe(cause: unknown, t: Messages): string {

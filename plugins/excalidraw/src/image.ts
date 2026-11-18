@@ -19,6 +19,37 @@ function binaryBytes(dataURL: string): number {
   return Math.floor(((dataURL.length - comma - 1) * 3) / 4);
 }
 
+/** The raw bytes behind a `data:` URL, with the mime type of its header. */
+export function dataURLToBytes(dataURL: string): { bytes: Uint8Array; mimeType: string } | null {
+  const comma = dataURL.indexOf(',');
+  if (comma < 0) return null;
+
+  const header = dataURL.slice(0, comma);
+  const mimeType = /^data:([^;,]+)/.exec(header)?.[1] ?? 'application/octet-stream';
+
+  try {
+    const binary = atob(dataURL.slice(comma + 1));
+    const bytes = new Uint8Array(binary.length);
+    for (let i = 0; i < binary.length; i += 1) bytes[i] = binary.charCodeAt(i);
+
+    return { bytes, mimeType };
+  } catch {
+    return null;
+  }
+}
+
+/** A `data:` URL for bytes just downloaded, so Excalidraw can install them. */
+export function bytesToDataURL(bytes: Uint8Array, mimeType: string): string {
+  let binary = '';
+  const CHUNK = 0x8000;
+
+  for (let i = 0; i < bytes.length; i += CHUNK) {
+    binary += String.fromCharCode(...bytes.subarray(i, i + CHUNK));
+  }
+
+  return `data:${mimeType};base64,${btoa(binary)}`;
+}
+
 function load(dataURL: string): Promise<HTMLImageElement | null> {
   return new Promise((resolve) => {
     const image = new Image();
