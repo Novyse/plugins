@@ -46,14 +46,14 @@
         "url": "https://github.com/Novyse"
       },
       "description": "A shared Excalidraw whiteboard, one per voice room: everyone draws on the same board, every stroke in sync.",
-      "version": "0.2.1",
-      "tag": "excalidraw@0.2.1",
+      "version": "0.2.2",
+      "tag": "excalidraw@0.2.2",
       "icon": "plugins/excalidraw/store/icon.png",
       "banner": "plugins/excalidraw/store/banner.png",
       "entry": "plugins/excalidraw/dist/index.html",
       "bundle": "excalidraw-bundle.zip",
-      "sha256": "5befc97ffafb6defce6bfc29d011e2ae04cb5c684ad475f132b0aaead1865be7",
-      "sizeBytes": 7668710,
+      "sha256": "0b809bf166f5541e0d3fc307daa0de9f4b3f1df7429aa4db7eac74b5c2d534d1",
+      "sizeBytes": 7672701,
       "capabilities": [
         "stream"
       ],

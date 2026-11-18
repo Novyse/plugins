@@ -38,6 +38,276 @@ export function dataURLToBytes(dataURL: string): { bytes: Uint8Array; mimeType: 
   }
 }
 
+
+
+
+/**
+ * Applies the image filter Excalidraw asks for, on engines that ignore it.
+ */
+interface ColorFilter {
+  matrix: number[];
+  offset: number[];
+}
+
+const NEUTRAL: ColorFilter = { matrix: [1, 0, 0, 0, 1, 0, 0, 0, 1], offset: [0, 0, 0] };
+
+function multiply3(left: number[], right: number[]): number[] {
+  const out = new Array<number>(9).fill(0);
+  for (let row = 0; row < 3; row += 1) {
+    for (let column = 0; column < 3; column += 1) {
+      let sum = 0;
+      for (let k = 0; k < 3; k += 1) sum += left[row * 3 + k] * right[k * 3 + column];
+      out[row * 3 + column] = sum;
+    }
+  }
+  return out;
+}
+
+function apply3(matrix: number[], vector: number[]): number[] {
+  return [0, 1, 2].map(
+    (row) =>
+      matrix[row * 3] * vector[0] +
+      matrix[row * 3 + 1] * vector[1] +
+      matrix[row * 3 + 2] * vector[2],
+  );
+}
+
+function then(after: ColorFilter, before: ColorFilter): ColorFilter {
+  return {
+    matrix: multiply3(after.matrix, before.matrix),
+    offset: apply3(after.matrix, before.offset).map((value, i) => value + after.offset[i]),
+  };
+}
+
+function saturationMatrix(amount: number): number[] {
+  return [
+    0.213 + 0.787 * amount, 0.715 - 0.715 * amount, 0.072 - 0.072 * amount,
+    0.213 - 0.213 * amount, 0.715 + 0.285 * amount, 0.072 - 0.072 * amount,
+    0.213 - 0.213 * amount, 0.715 - 0.715 * amount, 0.072 + 0.928 * amount,
+  ];
+}
+
+function filterStep(name: string, value: number, radians: number): ColorFilter | null {
+  switch (name) {
+    case 'invert':
+      return {
+        matrix: [1 - 2 * value, 0, 0, 0, 1 - 2 * value, 0, 0, 0, 1 - 2 * value],
+        offset: [value * 255, value * 255, value * 255],
+      };
+    case 'brightness':
+      return { matrix: [value, 0, 0, 0, value, 0, 0, 0, value], offset: [0, 0, 0] };
+    case 'saturate':
+      return { matrix: saturationMatrix(value), offset: [0, 0, 0] };
+    case 'hue-rotate': {
+      const cos = Math.cos(radians);
+      const sin = Math.sin(radians);
+      return {
+        matrix: [
+          0.213 + cos * 0.787 - sin * 0.213, 0.715 - cos * 0.715 - sin * 0.715, 0.072 - cos * 0.072 + sin * 0.928,
+          0.213 - cos * 0.213 + sin * 0.143, 0.715 + cos * 0.285 + sin * 0.14, 0.072 - cos * 0.072 - sin * 0.283,
+          0.213 - cos * 0.213 - sin * 0.787, 0.715 - cos * 0.715 + sin * 0.715, 0.072 + cos * 0.928 + sin * 0.072,
+        ],
+        offset: [0, 0, 0],
+      };
+    }
+    default:
+      return null;
+  }
+}
+
+/** A CSS `filter` value as one color transform, or `null` when unsupported. */
+function parseColorFilter(filter: string): ColorFilter | null {
+  const pattern = /([a-z-]+)\(([^)]*)\)/gi;
+  let combined: ColorFilter = NEUTRAL;
+  let found = 0;
+  let match: RegExpExecArray | null;
+
+  while ((match = pattern.exec(filter)) !== null) {
+    const name = match[1].toLowerCase();
+    const raw = match[2].trim();
+    let value = 0;
+    let radians = 0;
+
+    if (name === 'hue-rotate') {
+      const parsed = /([-\d.]+)(deg|rad|turn)?/i.exec(raw);
+      if (!parsed) return null;
+      value = Number(parsed[1]);
+      radians =
+        parsed[2] === 'rad'
+          ? value
+          : parsed[2] === 'turn'
+            ? value * Math.PI * 2
+            : (value * Math.PI) / 180;
+    } else {
+      const parsed = /([-\d.]+)\s*(%?)/.exec(raw);
+      if (!parsed) return null;
+      value = Number(parsed[1]) / (parsed[2] === '%' ? 100 : 1);
+    }
+
+    const step = filterStep(name, value, radians);
+    if (!step) return null;
+
+    combined = then(step, combined);
+    found += 1;
+  }
+
+  return found > 0 ? combined : null;
+}
+
+/** Baked bitmaps, one per image and filter: the render loop reuses them. */
+const bakedImages = new WeakMap<object, Map<string, HTMLCanvasElement>>();
+
+/** Largest bitmap worth baking; past this the plain draw is the better deal. */
+const MAX_BAKED_PIXELS = 4096 * 4096;
+
+function bakeFilter(
+  image: HTMLImageElement,
+  filter: string,
+  color: ColorFilter,
+  drawRaw: (target: CanvasRenderingContext2D, source: CanvasImageSource) => void,
+): HTMLCanvasElement | null {
+  const cached = bakedImages.get(image)?.get(filter);
+  if (cached) return cached;
+
+  const width = image.naturalWidth || image.width;
+  const height = image.naturalHeight || image.height;
+  if (width === 0 || height === 0 || width * height > MAX_BAKED_PIXELS) return null;
+
+  const canvas = document.createElement('canvas');
+  canvas.width = width;
+  canvas.height = height;
+
+  const context = canvas.getContext('2d', { willReadFrequently: true });
+  if (!context) return null;
+
+  drawRaw(context, image);
+
+  let pixels: ImageData;
+  try {
+    pixels = context.getImageData(0, 0, width, height);
+  } catch {
+    return null;
+  }
+
+  const [m0, m1, m2, m3, m4, m5, m6, m7, m8] = color.matrix;
+  const [o0, o1, o2] = color.offset;
+  const clamp = (value: number) => (value < 0 ? 0 : value > 255 ? 255 : value);
+  const data = pixels.data;
+
+  for (let index = 0; index < data.length; index += 4) {
+    const r = data[index];
+    const g = data[index + 1];
+    const b = data[index + 2];
+
+    data[index] = clamp(m0 * r + m1 * g + m2 * b + o0);
+    data[index + 1] = clamp(m3 * r + m4 * g + m5 * b + o1);
+    data[index + 2] = clamp(m6 * r + m7 * g + m8 * b + o2);
+  }
+
+  context.putImageData(pixels, 0, 0);
+
+  if (!bakedImages.has(image)) bakedImages.set(image, new Map());
+  bakedImages.get(image)!.set(filter, canvas);
+
+  return canvas;
+}
+
+/** True when this engine applies `ctx.filter` to a `drawImage` at all. */
+function honorsCanvasFilter(): boolean {
+  try {
+    const source = document.createElement('canvas');
+    source.width = 1;
+    source.height = 1;
+    const sourceContext = source.getContext('2d');
+    if (!sourceContext) return true;
+    sourceContext.fillStyle = '#ff0000';
+    sourceContext.fillRect(0, 0, 1, 1);
+
+    const target = document.createElement('canvas');
+    target.width = 1;
+    target.height = 1;
+    const targetContext = target.getContext('2d', { willReadFrequently: true });
+    if (!targetContext) return true;
+
+    targetContext.filter = 'invert(1)';
+    targetContext.drawImage(source, 0, 0);
+
+    const pixel = targetContext.getImageData(0, 0, 1, 1).data;
+    return pixel[0] === 0 && pixel[1] === 255 && pixel[2] === 255;
+  } catch {
+    return true;
+  }
+}
+
+let filterFallbackInstalled = false;
+
+/**
+ * Compensates images on engines whose `ctx.filter` does nothing.
+ *
+ * Called once per document. Engines that honour the filter are left untouched:
+ * no wrapper, no pixel work, the normal path stays exactly as it is.
+ */
+export function installImageFilterFallback(): void {
+  try {
+    if (filterFallbackInstalled || honorsCanvasFilter()) return;
+    filterFallbackInstalled = true;
+
+    const prototype = CanvasRenderingContext2D.prototype;
+    const original = prototype.drawImage as unknown as (
+      this: CanvasRenderingContext2D,
+      ...args: unknown[]
+    ) => void;
+
+    prototype.drawImage = function patchedDrawImage(
+      this: CanvasRenderingContext2D,
+      source: CanvasImageSource,
+      ...rest: unknown[]
+    ): void {
+      try {
+        const filter = this.filter;
+
+        // Only the theme inversion, only a real image, so the rasters
+        // Excalidraw builds from it are drawn once, unfiltered.
+        if (
+          !filter ||
+          filter === 'none' ||
+          filter.indexOf('invert') === -1 ||
+          !(source instanceof HTMLImageElement)
+        ) {
+          original.apply(this, [source, ...rest]);
+          return;
+        }
+
+        const color = parseColorFilter(filter);
+        const baked = color
+          ? bakeFilter(source, filter, color, (target, image) => {
+              original.call(target, image, 0, 0, target.canvas.width, target.canvas.height);
+            })
+          : null;
+
+        if (!baked) {
+          original.apply(this, [source, ...rest]);
+          return;
+        }
+
+        // The pixels already carry the filter: asking for it again would
+        // double it, and on this engine double it into black.
+        this.filter = 'none';
+        try {
+          original.apply(this, [baked, ...rest]);
+        } finally {
+          this.filter = filter;
+        }
+      } catch {
+        original.apply(this, [source, ...rest]);
+      }
+    } as typeof prototype.drawImage;
+  } catch {
+    // A canvas prototype that refuses the patch is not a reason to break the
+    // board: images keep the engine's own behaviour.
+  }
+}
+
 /** A `data:` URL for bytes just downloaded, so Excalidraw can install them. */
 export function bytesToDataURL(bytes: Uint8Array, mimeType: string): string {
   let binary = '';
@@ -60,38 +330,53 @@ function load(dataURL: string): Promise<HTMLImageElement | null> {
 }
 
 /**
- * Decodes an image so the later `addFiles` paints on the first frame.
- *
- * Excalidraw warms its own image cache asynchronously: installing a cold file
- * can paint an empty rectangle with no further event to retrigger it, the
- * late joiner that only sees the image after nudging it. Awaiting this first
- * (and again after installing) makes the first `addFiles` frame hit warm.
+ * Waits until the decoded bitmap is actually paintable.
  */
-export function warmImage(dataURL: string, timeoutMs = 5000): Promise<void> {
-  return new Promise((resolve) => {
-    let done = false;
-    const finish = () => {
-      if (!done) {
-        done = true;
-        resolve();
-      }
-    };
+export async function ensurePaintable(
+  dataURL: string,
+  maxFrames = 30,
+): Promise<void> {
+  const image = await load(dataURL);
+  if (!image || image.naturalWidth === 0 || image.naturalHeight === 0) return;
 
-    const timer = window.setTimeout(finish, timeoutMs);
-    const image = new Image();
-    image.onload = () => {
-      window.clearTimeout(timer);
-      // Hold one frame: some engines decode lazily and report `load` before
-      // the bitmap is paintable. The extra frame costs nothing on the fast
-      // path and saves the late joiner an empty rectangle.
-      requestAnimationFrame(() => finish());
-    };
-    image.onerror = () => {
-      window.clearTimeout(timer);
-      finish();
-    };
-    image.src = dataURL;
-  });
+  const canvas = document.createElement('canvas');
+  canvas.width = 1;
+  canvas.height = 1;
+  const context = canvas.getContext('2d', { willReadFrequently: true });
+  if (!context) return;
+
+  // A backgrounded tab stops firing animation frames: without a deadline
+  // the wait below would never end and the file would never install.
+  let expired = false;
+  const timer = window.setTimeout(() => {
+    expired = true;
+  }, 3000);
+
+  try {
+    for (let frame = 0; frame < maxFrames; frame += 1) {
+      if (expired) return;
+      // Either clock may stall (background tab, throttled timers): whichever
+      // fires first moves the wait forward, the deadline caps it.
+      await Promise.race([
+        new Promise((resolve) => requestAnimationFrame(resolve)),
+        new Promise((resolve) => window.setTimeout(resolve, 250)),
+      ]);
+      if (expired) return;
+
+      try {
+        context.clearRect(0, 0, 1, 1);
+        // A 1px draw averages the whole bitmap: any real picture answers with
+        // a non-empty pixel on the first frames after the decode settles.
+        context.drawImage(image, 0, 0, 1, 1);
+        const [r, g, b, a] = context.getImageData(0, 0, 1, 1).data;
+        if (a !== 0 || r !== 0 || g !== 0 || b !== 0) return;
+      } catch {
+        return;
+      }
+    }
+  } finally {
+    window.clearTimeout(timer);
+  }
 }
 
 /**
