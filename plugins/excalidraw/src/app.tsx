@@ -6,7 +6,13 @@ import { getAppSDK, type InitPayload, type StateEvent } from '@novyse/app-sdk';
 import { Board } from './board';
 import { messagesFor, normalizeLocale, type Locale, type Messages } from './i18n';
 import { Presence, type Viewport } from './presence';
-import { bytesToDataURL, dataURLToBytes, shrinkImage, warmImage } from './image';
+import {
+  bytesToDataURL,
+  dataURLToBytes,
+  ensurePaintable,
+  installImageFilterFallback,
+  shrinkImage,
+} from './image';
 import {
   APP_STATE,
   DEFAULT_APP_STATE,
@@ -62,6 +68,7 @@ interface BoardApi {
   }): void;
   getFiles(): Record<string, ExcalidrawFile>;
   addFiles(files: ExcalidrawFile[]): void;
+  refresh?: () => void;
 }
 
 interface ContainerState {
@@ -185,6 +192,20 @@ export function App() {
 
     api.updateScene({ elements });
 
+    const fresh: ExcalidrawFile[] = [];
+    for (const element of elements) {
+      if (element.type !== 'image' || typeof element.fileId !== 'string') continue;
+      if (filledRef.current.has(element.id)) continue;
+      const file = localFilesRef.current.get(element.fileId);
+      if (!file) continue;
+      filledRef.current.add(element.id);
+      fresh.push(file);
+    }
+    if (fresh.length > 0) {
+      api.addFiles(fresh);
+      repaintSoon(api, fresh);
+    }
+
     // Excalidraw may normalize what it was given: refresh the comparison
     // baseline from the scene so the normalization is not mistaken for a local
     // edit and published back to the room.
@@ -245,15 +266,23 @@ export function App() {
    */
   const pendingFilesRef = useRef(new Map<string, ExcalidrawFile>());
 
+  /**
+   * Every file installed this session, by `fileId`.
+   */
+  const localFilesRef = useRef(new Map<string, ExcalidrawFile>());
+  const filledRef = useRef(new Set<string>());
+
   const installPendingFiles = useCallback(() => {
     const api = apiRef.current;
     if (!api || pendingFilesRef.current.size === 0) return;
 
-    api.addFiles([...pendingFilesRef.current.values()]);
+    const files = [...pendingFilesRef.current.values()];
+    api.addFiles(files);
+    for (const file of files) localFilesRef.current.set(file.id, file);
     pendingFilesRef.current.clear();
 
     scheduleRenderRef.current();
-    window.setTimeout(() => scheduleRenderRef.current(), 350);
+    repaintSoon(api, files);
   }, []);
 
   const installPendingFilesRef = useRef(installPendingFiles);
@@ -363,7 +392,7 @@ export function App() {
 
           const bytes = new Uint8Array(await response.arrayBuffer());
           const dataURL = bytesToDataURL(bytes, ref.mimeType);
-          await warmImage(dataURL).catch(() => {});
+          await ensurePaintable(dataURL);
 
           const current = boardRef.current;
           if (!current || current.hasFile(ref.id)) return;
@@ -585,6 +614,10 @@ export function App() {
   useEffect(() => {
     let alive = true;
 
+    // Dark theme inverts the whole canvas and compensates each image through
+    // `ctx.filter`; engines that drop it would show inverted photos.
+    installImageFilterFallback();
+
     const folder = createFolder();
 
     const offs = EVENT_TYPES.map((type) =>
@@ -696,9 +729,15 @@ export function App() {
           excalidrawAPI={(api) => {
             apiRef.current = api as unknown as BoardApi;
 
-            installPendingFilesRef.current();
-            renderRef.current();
-            applyAppStateRef.current();
+            // This callback runs while Excalidraw is still rendering: an
+            // update pushed from here races its first paint, and whenever it
+            // loses, the scene stays empty until something else redraws it.
+            // One frame later the canvas owns its scene and the updates land.
+            window.requestAnimationFrame(() => {
+              installPendingFilesRef.current();
+              renderRef.current();
+              applyAppStateRef.current();
+            });
           }}
           onChange={(_scene, appState) => {
             const state = appState as unknown as ContainerState;
@@ -728,6 +767,26 @@ export function App() {
       ) : null}
     </main>
   );
+}
+
+
+/**
+ * Redraws the canvas now, and again once the asynchronous fill is done.
+ */
+function repaintSoon(api: BoardApi, files: ExcalidrawFile[] = []): void {
+  const bump = () => {
+    if (files.length > 0) {
+      try {
+        api.addFiles(files);
+      } catch {
+        // A fill that refuses is not a reason to lose the repaint below.
+      }
+    }
+    api.updateScene({ elements: api.getSceneElements() });
+  };
+
+  window.requestAnimationFrame(bump);
+  for (const delay of [120, 400, 1000]) window.setTimeout(bump, delay);
 }
 
 /** File name of an image upload: the id plus the extension of its mime type. */
