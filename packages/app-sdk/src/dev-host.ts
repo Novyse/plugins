@@ -25,7 +25,15 @@
  *   confirmed while this one was open) instead of a bucket, so a file uploaded
  *   before a tab opens is not there for it, reload the uploader instead.
  */
-import type { ActionEvent, AppSDK, InitPayload, StateEvent, Uuid } from './index';
+import type {
+  ActionEvent,
+  ActivityControls,
+  AppSDK,
+  ControlAnchor,
+  InitPayload,
+  StateEvent,
+  Uuid,
+} from './index';
 import {
   DEFAULT_THEME_COLORS,
   normalizeTheme,
@@ -96,8 +104,18 @@ export function installDevHost(options: DevHostOptions): void {
   const participantsListeners = new Set<(participants: Uuid[]) => void>();
   const endedListeners = new Set<(reason: 'stopped' | 'host-gone') => void>();
   const themeListeners = new Set<(theme: ThemeState) => void>();
+  const controlsListeners = new Set<(controls: ActivityControls) => void>();
 
   let themeState = devTheme(options);
+
+  // The fake chrome: a browser tab has no grid to pin into and no tile to
+  // close, but the buttons must still answer, so the state changes locally.
+  const controls: ActivityControls = { pinned: false, fullscreen: false, closable: true };
+
+  const setControls = (next: Partial<ActivityControls>) => {
+    Object.assign(controls, next);
+    for (const listener of controlsListeners) listener({ ...controls });
+  };
 
   // No palette of the app exists here: when the user switches the system
   // theme, the fake host answers exactly like the app does, so `onTheme` and
@@ -225,6 +243,7 @@ export function installDevHost(options: DevHostOptions): void {
             participants: [...participants],
             serverNow: Date.now(),
             readOnly: false,
+            controls: { ...controls },
             capabilities: ['stream', 'fullscreen', 'network'],
             locale: options.locale ?? devLocale(),
             theme: themeState.theme,
@@ -324,14 +343,32 @@ export function installDevHost(options: DevHostOptions): void {
     ui: {
       requestFullscreen() {
         void document.documentElement.requestFullscreen?.();
+        setControls({ fullscreen: true });
       },
       exitFullscreen() {
         void document.exitFullscreen?.();
+        setControls({ fullscreen: false });
       },
       close() {
         for (const listener of endedListeners) {
           listener('stopped');
         }
+      },
+      pin() {
+        setControls({ pinned: true });
+      },
+      unpin() {
+        setControls({ pinned: false });
+      },
+      openMenu(anchor?: ControlAnchor) {
+        // There is no room to draw a context menu for: the harness only says
+        // the host received the call, so a plugin can be developed offline.
+        // eslint-disable-next-line no-console
+        console.info('[dev-host] context menu', anchor ?? null);
+      },
+      onControls(callback) {
+        controlsListeners.add(callback);
+        return () => controlsListeners.delete(callback);
       },
     },
 

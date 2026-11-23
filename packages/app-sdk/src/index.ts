@@ -39,6 +39,26 @@ export interface ActionEvent<T = unknown> {
   data: T;
 }
 
+/**
+ * The chrome of the tile, owned by the host.
+ */
+export interface ActivityControls {
+  /** The tile is pinned over the grid. */
+  pinned: boolean;
+  /** The tile fills the room. */
+  fullscreen: boolean;
+  /** The user may stop the activity: false for a read-only participant. */
+  closable: boolean;
+}
+
+/** Where a control sits on the page, in CSS pixels of the plugin viewport. */
+export interface ControlAnchor {
+  x: number;
+  y: number;
+  width: number;
+  height: number;
+}
+
 export interface InitPayload {
   instanceId: string;
   plugin: { slug: string; version: string };
@@ -54,6 +74,8 @@ export interface InitPayload {
    * `E_FORBIDDEN`. Render a passive view, do not hide the content.
    */
   readOnly: boolean;
+  /** State of the tile chrome: pin, fullscreen, close. */
+  controls?: ActivityControls;
   /** Declared in `plugin.json`, reviewed with the code. */
   capabilities: string[];
   /**
@@ -171,6 +193,22 @@ export interface AppSDK {
     requestFullscreen(): void;
     exitFullscreen(): void;
     close(): void;
+    /** Pins the tile over the grid of the room. */
+    pin(): void;
+    /** Releases the tile back into the grid. */
+    unpin(): void;
+    /**
+     * Opens the context menu of the tile, under the button that was pressed.
+     *
+     * [anchor] is the rect of that button in CSS pixels, relative to the
+     * plugin viewport: the host places the menu below it.
+     */
+    openMenu(anchor?: ControlAnchor): void;
+    /**
+     * The tile chrome changed: the host was pinned, resized or the user went
+     * fullscreen. `init().controls` carries the first state.
+     */
+    onControls(callback: (controls: ActivityControls) => void): () => void;
   };
 
   /**
@@ -225,6 +263,12 @@ export interface AppSDK {
 
   log(level: 'debug' | 'info' | 'warn' | 'error', ...args: unknown[]): void;
 }
+
+export type {
+  ActivityControlLabels,
+  ActivityControlsOptions,
+} from './controls';
+export { activityControlLabels, mountActivityControls } from './controls';
 
 export type {
   ThemeColorName,
