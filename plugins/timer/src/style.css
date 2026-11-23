@@ -1,0 +1,477 @@
+@import "tailwindcss";
+
+/* Palette copied from the Novyse client (theme seed #0F6FFF, Material 3
+   fidelity + the app's brand tint): dark surface #071427, light #F5F9FF. */
+:root {
+  color-scheme: dark;
+}
+
+html,
+body,
+#app {
+  height: 100%;
+  margin: 0;
+}
+
+body {
+  background: var(--nv-background, #071427);
+  font-family:
+    Inter,
+    system-ui,
+    -apple-system,
+    "Segoe UI",
+    sans-serif;
+  overscroll-behavior: none;
+  -webkit-user-select: none;
+  user-select: none;
+}
+
+.timer {
+  /* `themeColors` (the default): the host writes these to the root element.
+     The fallback is the plugin's own palette, used before `init()` answers. */
+  --bg: var(--nv-background, #071427);
+  --surface: var(--nv-surface, #0a182f);
+  --surface-hover: var(--nv-surface-hover, #102038);
+  --field: var(--nv-field, #12223b);
+  --line: var(--nv-line, #1c2a40);
+  --outline: var(--nv-outline, #1d3251);
+  --text: var(--nv-text, #eaf2ff);
+  --muted: var(--nv-muted, #b8cff2);
+  --primary: var(--nv-primary, #5a9cff);
+  --on-primary: var(--nv-on-primary, #ffffff);
+  --accent: var(--nv-primary, #5a9cff);
+  --accent-soft: var(--nv-primary-soft, rgba(90, 156, 255, 0.16));
+  --danger: var(--nv-danger, #e45757);
+
+  box-sizing: border-box;
+  height: 100%;
+  display: flex;
+  flex-direction: column;
+  gap: clamp(8px, 2.2vmin, 14px);
+  padding: clamp(10px, 3vmin, 22px);
+  overflow-y: auto;
+  overscroll-behavior: contain;
+  color: var(--text);
+  background: var(--bg);
+  transition: background-color 0.3s ease;
+}
+
+/* Theme-type mode: a plugin that does not use `themeColors` can stop here and
+   let this block paint the light mode. With `themeColors` the host variables
+   above win, because every token reads `var(--nv-…, fallback)`. */
+.timer--light {
+  --bg: var(--nv-background, #f5f9ff);
+  --surface: var(--nv-surface, #f1f6ff);
+  --surface-hover: var(--nv-surface-hover, #ecf3ff);
+  --field: var(--nv-field, #ffffff);
+  --line: var(--nv-line, #e5eefa);
+  --outline: var(--nv-outline, #d9e7fb);
+  --text: var(--nv-text, #0e1826);
+  --muted: var(--nv-muted, #53637b);
+  --primary: var(--nv-primary, #0f6fff);
+  --on-primary: var(--nv-on-primary, #ffffff);
+  --accent: var(--nv-primary, #0f6fff);
+  --accent-soft: var(--nv-primary-soft, rgba(15, 111, 255, 0.1));
+  --danger: var(--nv-danger, #e45757);
+
+  color-scheme: light;
+}
+
+/* The mode only colors the ring and the active tab: buttons stay on the
+   primary accent of the app, so every screen has the same call to action. */
+.timer[data-phase="short"] {
+  --accent: var(--nv-success, #1dbf73);
+  --accent-soft: rgba(29, 191, 115, 0.16);
+  --accent-soft: color-mix(in srgb, var(--nv-success, #1dbf73) 16%, transparent);
+}
+
+.timer__header {
+  display: flex;
+  align-items: flex-start;
+  justify-content: space-between;
+  gap: 10px;
+}
+
+.timer__heading {
+  min-width: 0;
+}
+
+.timer__title {
+  margin: 0;
+  font-size: clamp(15px, 3.4vmin, 19px);
+  font-weight: 650;
+  letter-spacing: -0.01em;
+}
+
+.timer__subtitle {
+  margin: 2px 0 0;
+  color: var(--muted);
+  font-size: 11px;
+  white-space: nowrap;
+  overflow: hidden;
+  text-overflow: ellipsis;
+}
+
+.timer__tools {
+  display: flex;
+  gap: 6px;
+  flex-shrink: 0;
+}
+
+.icon-button {
+  width: 32px;
+  height: 32px;
+  display: grid;
+  place-items: center;
+  border: 1px solid var(--line);
+  border-radius: 9px;
+  background: var(--surface);
+  color: var(--muted);
+  cursor: pointer;
+  transition:
+    color 0.15s ease,
+    background-color 0.15s ease;
+}
+
+.icon-button:hover {
+  color: var(--text);
+  background: var(--surface-hover);
+}
+
+.timer__phases {
+  display: flex;
+  gap: 4px;
+  padding: 3px;
+  border: 1px solid var(--line);
+  border-radius: 10px;
+  background: var(--surface);
+}
+
+.phase {
+  flex: 1;
+  min-width: 0;
+  padding: 7px 6px;
+  border: 0;
+  border-radius: 7px;
+  background: transparent;
+  color: var(--muted);
+  font: inherit;
+  font-size: 11.5px;
+  font-weight: 600;
+  white-space: nowrap;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  cursor: pointer;
+  transition:
+    background-color 0.15s ease,
+    color 0.15s ease,
+    box-shadow 0.15s ease;
+}
+
+.phase--active {
+  background: var(--accent-soft);
+  color: var(--text);
+  box-shadow: inset 0 0 0 1px var(--accent);
+}
+
+.phase:disabled {
+  cursor: default;
+  opacity: 0.6;
+}
+
+.timer__dial {
+  position: relative;
+  flex: 0 0 auto;
+  width: min(50vmin, 280px, 100%);
+  aspect-ratio: 1;
+  margin: auto;
+}
+
+.dial {
+  display: block;
+  width: 100%;
+  height: 100%;
+}
+
+.dial__track {
+  fill: none;
+  stroke: var(--outline);
+  stroke-width: 7;
+}
+
+.dial__value {
+  fill: none;
+  stroke: var(--accent);
+  stroke-width: 7;
+  stroke-linecap: round;
+  transition:
+    stroke-dashoffset 0.25s linear,
+    stroke 0.3s ease;
+}
+
+.dial__center {
+  position: absolute;
+  inset: 0;
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  justify-content: center;
+  gap: 5px;
+  text-align: center;
+}
+
+.dial__time {
+  font-size: clamp(1.7rem, 9vmin, 3rem);
+  font-weight: 650;
+  line-height: 1;
+  letter-spacing: -0.03em;
+  font-variant-numeric: tabular-nums;
+}
+
+/* Central picker: the duration replaces the countdown while paused. */
+.dial__editor {
+  display: flex;
+  align-items: flex-start;
+  justify-content: center;
+  gap: clamp(1px, 0.8vmin, 5px);
+  max-width: 92%;
+}
+
+.time-col {
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  gap: 1px;
+}
+
+.time-col__arrow {
+  width: clamp(24px, 5.6vmin, 34px);
+  height: clamp(16px, 3.4vmin, 22px);
+  display: grid;
+  place-items: center;
+  padding: 0;
+  border: 0;
+  border-radius: 6px;
+  background: transparent;
+  color: var(--muted);
+  cursor: pointer;
+  transition:
+    color 0.12s ease,
+    background-color 0.12s ease;
+}
+
+.time-col__arrow:hover:not(:disabled) {
+  color: var(--text);
+  background: var(--surface);
+}
+
+.time-col__arrow:active:not(:disabled) {
+  transform: scale(0.92);
+}
+
+.time-col__arrow:disabled {
+  cursor: default;
+  opacity: 0.3;
+}
+
+.time-col__value {
+  width: clamp(38px, 8vmin, 58px);
+  padding: 0;
+  border: 0;
+  border-radius: 8px;
+  background: transparent;
+  color: var(--text);
+  font: inherit;
+  font-size: clamp(1.45rem, 7vmin, 2.55rem);
+  font-weight: 650;
+  line-height: 1.05;
+  letter-spacing: -0.03em;
+  text-align: center;
+  font-variant-numeric: tabular-nums;
+}
+
+.time-col__value:focus {
+  background: var(--surface);
+  outline: 2px solid var(--primary);
+  outline-offset: 1px;
+}
+
+.time-col__value:disabled {
+  opacity: 0.55;
+}
+
+.time-col__unit {
+  margin-top: 2px;
+  color: var(--muted);
+  font-size: 9px;
+  font-weight: 700;
+  text-transform: uppercase;
+  letter-spacing: 0.12em;
+}
+
+.dial__colon {
+  margin-top: clamp(16px, 3.4vmin, 23px);
+  color: var(--muted);
+  font-size: clamp(1.35rem, 6.2vmin, 2.2rem);
+  font-weight: 650;
+  line-height: 1;
+}
+
+.dial__state {
+  color: var(--muted);
+  font-size: 10.5px;
+  text-transform: uppercase;
+  letter-spacing: 0.12em;
+}
+
+.timer__controls {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 6px;
+}
+
+.button {
+  flex: 1 1 auto;
+  min-width: 84px;
+  padding: 9px 12px;
+  border: 1px solid var(--line);
+  border-radius: 10px;
+  background: var(--surface);
+  color: var(--text);
+  font: inherit;
+  font-size: 12.5px;
+  font-weight: 600;
+  cursor: pointer;
+  transition:
+    background-color 0.15s ease,
+    transform 0.1s ease;
+}
+
+.button:hover:not(:disabled) {
+  background: var(--surface-hover);
+}
+
+.button:active:not(:disabled) {
+  transform: translateY(1px);
+}
+
+.button:disabled {
+  cursor: default;
+  opacity: 0.45;
+}
+
+.button--primary {
+  flex-grow: 2;
+  border-color: transparent;
+  background: var(--primary);
+  color: var(--on-primary);
+}
+
+.button--primary:hover:not(:disabled) {
+  background: var(--primary);
+  filter: brightness(1.08);
+}
+
+.banner {
+  margin: 0;
+  padding: 6px 9px;
+  border: 1px solid var(--line);
+  border-radius: 8px;
+  background: var(--surface);
+  color: var(--muted);
+  font-size: 11px;
+}
+
+.banner--error {
+  border-color: rgba(228, 87, 87, 0.4);
+  background: rgba(228, 87, 87, 0.1);
+  color: var(--danger);
+}
+
+.timer__loading {
+  margin: auto;
+  color: var(--muted);
+  font-size: 12px;
+  text-align: center;
+}
+
+button:focus-visible,
+input:focus-visible {
+  outline: 2px solid var(--primary);
+  outline-offset: 2px;
+}
+
+@media (prefers-reduced-motion: reduce) {
+  .dial__value,
+  .time-col__arrow {
+    transition: none;
+  }
+}
+
+@media (max-height: 520px) {
+  .timer[data-editing="true"] .timer__dial {
+    width: min(34vh, 180px);
+  }
+
+  .dial__editor {
+    gap: 1px;
+  }
+
+  .time-col__value {
+    width: clamp(32px, 7vh, 46px);
+    font-size: clamp(1.2rem, 6vh, 2rem);
+  }
+
+  .time-col__arrow {
+    width: 26px;
+    height: 16px;
+  }
+
+  .dial__colon {
+    margin-top: 17px;
+    font-size: clamp(1.1rem, 5vh, 1.7rem);
+  }
+}
+
+@media (max-height: 420px) {
+  .timer {
+    gap: 6px;
+    padding: 9px;
+  }
+
+  .timer__subtitle {
+    display: none;
+  }
+
+  .timer__dial,
+  .timer[data-editing="true"] .timer__dial {
+    width: min(30vh, 165px);
+  }
+
+  .dial__time {
+    font-size: clamp(1.25rem, 6vh, 2rem);
+  }
+
+  .timer__controls .button {
+    padding: 7px 10px;
+  }
+
+  .time-col__value {
+    width: 32px;
+    font-size: 1.25rem;
+  }
+
+  .time-col__arrow {
+    width: 24px;
+    height: 14px;
+  }
+
+  .time-col__unit {
+    font-size: 8px;
+  }
+
+  .dial__colon {
+    margin-top: 15px;
+    font-size: 1.2rem;
+  }
+}
