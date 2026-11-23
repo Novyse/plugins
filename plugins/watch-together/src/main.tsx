@@ -18,6 +18,8 @@ if (import.meta.env.DEV) {
 watchTheme(getAppSDK());
 
 
-mountActivityControls(getAppSDK());
+// The surface of this plugin is a video: the chrome stays a small dot in the
+// corner until it is asked for, and unfolds downwards.
+mountActivityControls(getAppSDK(), { open: false, orientation: 'vertical' });
 
 render(<App />, document.getElementById('app')!);

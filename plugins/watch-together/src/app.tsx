@@ -383,6 +383,11 @@ export function App() {
                 placeholder={t.placeholder}
                 value={link}
                 disabled={readOnly}
+                onKeyDown={(event) => {
+                  if (event.key !== 'Enter') return;
+                  event.preventDefault();
+                  void submit();
+                }}
                 onInput={(event) => {
                   setLink((event.target as HTMLInputElement).value);
                   setLinkError(null);
