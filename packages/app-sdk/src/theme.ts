@@ -37,6 +37,12 @@
  * | 13 | `warning` | `--nv-warning` | warnings |
  * | 14 | `info` | `--nv-info` | neutral information |
  *
+ * The corner radius travels with the palette but is not a color, so it is not
+ * part of the array: `themeRadii` carries `sm` (controls), `md` (cards) and
+ * `lg` (dialogs, sheets) in CSS pixels, and `watchTheme` writes them to
+ * `--nv-radius-sm`, `--nv-radius-md` and `--nv-radius-lg`. A plugin that
+ * hardcodes its corners looks bolted on next to the app.
+ *
  * A theme-only plugin never reads `themeColors`; a `themeColors` plugin must
  * keep [DEFAULT_THEME_COLORS] as its fallback, because the array is missing in
  * plain `vite` (the dev host adds it, but the helpers are safe without it).
@@ -68,10 +74,23 @@ export type ThemeMode = 'light' | 'dark';
 /** Positional palette, see [THEME_COLOR_NAMES] for the order. */
 export type ThemeColors = readonly string[];
 
-/** The palette of the host: the mode and the colors that go with it. */
+/** Corner radii of the host, in CSS pixels. */
+export interface ThemeRadii {
+  /** Controls, chips, small inputs. */
+  sm: number;
+  /** Cards, panels, surfaces. */
+  md: number;
+  /** Dialogs, sheets, large containers. */
+  lg: number;
+}
+
+export type ThemeRadiusName = keyof ThemeRadii;
+
+/** The palette of the host: the mode, the colors and the radii. */
 export interface ThemeState {
   theme: ThemeMode;
   themeColors: ThemeColors;
+  radii: ThemeRadii;
 }
 
 /** The CSS custom property written for every slot. */
@@ -92,6 +111,21 @@ export const THEME_COLOR_VARIABLES: Record<ThemeColorName, string> = {
   warning: '--nv-warning',
   info: '--nv-info',
 };
+
+/** The CSS custom property written for every radius. */
+export const THEME_RADIUS_VARIABLES: Record<ThemeRadiusName, string> = {
+  sm: '--nv-radius-sm',
+  md: '--nv-radius-md',
+  lg: '--nv-radius-lg',
+};
+
+/**
+ * Stock radii, in CSS pixels: the corners of the default Novyse theme.
+ *
+ * A round, a pill and a circle stay fixed in the plugin CSS: the host cannot
+ * describe them with one number.
+ */
+export const DEFAULT_THEME_RADII: ThemeRadii = { sm: 8, md: 16, lg: 24 };
 
 /**
  * Fallback palette, for development and for a host older than the plugin.
@@ -147,6 +181,24 @@ export function isThemeColors(value: unknown): value is ThemeColors {
   );
 }
 
+/** True when `value` is a radius set sent by the host. */
+export function isThemeRadii(value: unknown): value is ThemeRadii {
+  if (!value || typeof value !== 'object') return false;
+
+  const radii = value as Record<string, unknown>;
+
+  return (['sm', 'md', 'lg'] as const).every((name) => {
+    const radius = radii[name];
+
+    return (
+      typeof radius === 'number' &&
+      Number.isFinite(radius) &&
+      radius >= 0 &&
+      radius <= 64
+    );
+  });
+}
+
 /** `dark` unless the browser clearly prefers light. */
 export function defaultThemeMode(): ThemeMode {
   try {
@@ -161,22 +213,28 @@ export function defaultThemeMode(): ThemeMode {
  * send one (development, or an app older than the plugin).
  */
 export function themeFromPayload(
-  payload?: Pick<InitPayload, 'theme' | 'themeColors'> | null,
+  payload?: Pick<InitPayload, 'theme' | 'themeColors' | 'themeRadii'> | null,
 ): ThemeState {
   const theme: ThemeMode =
     payload?.theme === 'light' ? 'light' : payload?.theme === 'dark' ? 'dark' : defaultThemeMode();
   const themeColors = isThemeColors(payload?.themeColors)
     ? payload.themeColors
     : DEFAULT_THEME_COLORS[theme];
+  const radii = isThemeRadii(payload?.themeRadii) ? payload.themeRadii : DEFAULT_THEME_RADII;
 
-  return { theme, themeColors };
+  return { theme, themeColors, radii };
 }
 
 /** `themeFromPayload` for an `onTheme` event, whose fields are untyped. */
-export function normalizeTheme(theme: unknown, themeColors: unknown): ThemeState {
+export function normalizeTheme(
+  theme: unknown,
+  themeColors: unknown,
+  themeRadii?: unknown,
+): ThemeState {
   return themeFromPayload({
     theme: theme === 'light' || theme === 'dark' ? theme : undefined,
     themeColors: isThemeColors(themeColors) ? themeColors : undefined,
+    themeRadii: isThemeRadii(themeRadii) ? themeRadii : undefined,
   });
 }
 
@@ -201,7 +259,23 @@ export function applyThemeColors(
     root.style.setProperty(THEME_COLOR_VARIABLES[name], theme.themeColors[index] ?? '');
   });
 
+  applyThemeRadii(theme.radii, root);
   setThemeMode(theme.theme, root);
+}
+
+/**
+ * Writes the radii of the host to `--nv-radius-sm|md|lg`, in pixels.
+ *
+ * A rounded rectangle stays a rounded rectangle: the plugin picks which of the
+ * three matches its element, and keeps `50%`, a pill or a circle hardcoded.
+ */
+export function applyThemeRadii(
+  radii: ThemeRadii,
+  root: HTMLElement = document.documentElement,
+): void {
+  (Object.keys(THEME_RADIUS_VARIABLES) as ThemeRadiusName[]).forEach((name) => {
+    root.style.setProperty(THEME_RADIUS_VARIABLES[name], `${Math.round(radii[name])}px`);
+  });
 }
 
 /**
@@ -229,7 +303,7 @@ function onTheme(
   if (typeof subscribe !== 'function') return () => {};
 
   return subscribe.call(sdk, (payload) => {
-    callback(normalizeTheme(payload?.theme, payload?.themeColors));
+    callback(normalizeTheme(payload?.theme, payload?.themeColors, payload?.radii));
   });
 }
 
