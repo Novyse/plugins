@@ -58,6 +58,16 @@ theme mode, the selected palette and the surface treatment. It is positional:
 | 13 | `warning` | `--nv-warning` |
 | 14 | `info` | `--nv-info` |
 
+The corner radius travels with the palette but is not a color: `themeRadii`
+carries `sm`, `md` and `lg` in CSS pixels, written to `--nv-radius-sm`,
+`--nv-radius-md` and `--nv-radius-lg` by `watchTheme`:
+
+```css
+.card {
+  border-radius: var(--nv-radius-md, 16px);
+}
+```
+
 ```ts
 import { getAppSDK, watchTheme } from '@novyse/app-sdk';
 
@@ -101,7 +111,8 @@ another surface that CSS cannot color.
 The dev host sends the stock palette of the active mode, so the default mode
 works in `npm run dev` without the app. `?theme=light` previews the light mode
 and `?colors=%23f5f9ff,%23f1f6ff,...` overrides the slots, in the order above.
-The `installDevHost` options `theme` and `themeColors` do the same from code:
+The `installDevHost` options `theme`, `themeColors` and `themeRadii` do the same
+from code:
 
 ```ts
 installDevHost({ slug: 'hello-activity', theme: 'light' });

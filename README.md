@@ -113,6 +113,19 @@ whether the app is light or dark.
 | 13 | `warning` | `--nv-warning` | warnings |
 | 14 | `info` | `--nv-info` | neutral information |
 
+The corner radius of the app travels with the palette but is not a color, so it
+is not part of the array: `init().themeRadii` carries `sm` (controls), `md`
+(cards, panels) and `lg` (dialogs, sheets) in CSS pixels, and `watchTheme`
+writes them to `--nv-radius-sm`, `--nv-radius-md` and `--nv-radius-lg`.
+
+```css
+.panel {
+  border-radius: var(--nv-radius-md, 16px);
+}
+```
+
+A circle or a pill stays hardcoded: the host cannot describe it with one number.
+
 Call the helper once in `main.tsx`, before rendering:
 
 ```ts
