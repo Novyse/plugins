@@ -15,6 +15,10 @@
  *
  * The bar is fixed to the top-right corner of the sandbox and hidden until the
  * host answers `init()`: a plugin never draws a pin state it does not know.
+ *
+ * It can be mounted open or closed and growing horizontally or vertically, so a
+ * plugin whose surface is a video can keep a single small dot in the corner and
+ * unfold the options only when asked.
  */
 import type { ActivityControls, AppSDK } from './index';
 
@@ -25,6 +29,8 @@ export interface ActivityControlLabels {
   fullscreen: string;
   restore: string;
   more: string;
+  expand: string;
+  collapse: string;
 }
 
 const LABELS: Record<'en' | 'it', ActivityControlLabels> = {
@@ -35,6 +41,8 @@ const LABELS: Record<'en' | 'it', ActivityControlLabels> = {
     fullscreen: 'Full screen',
     restore: 'Exit full screen',
     more: 'More options',
+    expand: 'Show options',
+    collapse: 'Hide options',
   },
   it: {
     close: 'Chiudi attività',
@@ -43,6 +51,8 @@ const LABELS: Record<'en' | 'it', ActivityControlLabels> = {
     fullscreen: 'Schermo intero',
     restore: 'Esci da schermo intero',
     more: 'Altre opzioni',
+    expand: 'Mostra opzioni',
+    collapse: 'Nascondi opzioni',
   },
 };
 
@@ -64,6 +74,16 @@ export interface ControlAnchor {
 export interface ActivityControlsOptions {
   /** Override some labels; the rest comes from the language of the host. */
   labels?: Partial<ActivityControlLabels>;
+
+  /** Whether the options are shown from the start. Defaults to `true`. */
+  open?: boolean;
+
+  /**
+   * Which way the bar grows from its corner. The toggle keeps the corner, so a
+   * horizontal bar opens to the left and a vertical one opens downwards.
+   * Defaults to `horizontal`.
+   */
+  orientation?: 'horizontal' | 'vertical';
 }
 
 const STYLE_ID = 'nv-controls-style';
@@ -84,6 +104,13 @@ const STYLES = `
   box-shadow: 0 6px 18px rgba(0, 0, 0, 0.28);
 }
 .nv-controls[hidden] { display: none; }
+/* The toggle holds the corner: the options grow away from it, left or down. */
+.nv-controls__group { display: flex; gap: 4px; }
+.nv-controls--vertical { flex-direction: column; align-items: flex-end; }
+.nv-controls--vertical .nv-controls__group { flex-direction: column; }
+.nv-controls--vertical .nv-controls__toggle { order: -1; }
+.nv-controls--collapsed .nv-controls__group { display: none; }
+.nv-controls__toggle { color: var(--nv-muted, #b8cff2); }
 .nv-control {
   width: 30px;
   height: 30px;
@@ -121,6 +148,13 @@ const ICONS = {
   shrink:
     '<path d="M9 4v5H4M15 4v5h5M9 20v-5H4M15 20v-5h5" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round"/>',
   more: '<path d="M12 6.5v.01M12 12v.01M12 17.5v.01" fill="none" stroke="currentColor" stroke-width="2.6" stroke-linecap="round"/>',
+  chevronLeft: '<path d="M15 5l-7 7 7 7" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"/>',
+  chevronRight:
+    '<path d="M9 5l7 7-7 7" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"/>',
+  chevronDown:
+    '<path d="M5 9l7 7 7-7" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"/>',
+  chevronUp:
+    '<path d="M5 15l7-7 7 7" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"/>',
 };
 
 function svg(paths: string): string {
@@ -156,17 +190,31 @@ export function mountActivityControls(
 ): () => void {
   ensureStyles();
 
+  const vertical = options.orientation === 'vertical';
+  let open = options.open ?? true;
+
   const bar = document.createElement('div');
   bar.className = 'nv-controls';
   bar.hidden = true;
   bar.setAttribute('role', 'group');
+  bar.classList.toggle('nv-controls--vertical', vertical);
+  bar.classList.toggle('nv-controls--collapsed', !open);
 
   const close = iconButton('nv-control--danger');
   const pin = iconButton('');
   const fullscreen = iconButton('');
   const more = iconButton('');
 
-  bar.append(close, pin, fullscreen, more);
+  // The options live in their own box: the toggle keeps the corner alone when
+  // the chrome is closed, so the video shows a single small dot.
+  const group = document.createElement('div');
+  group.className = 'nv-controls__group';
+  group.append(close, pin, fullscreen, more);
+
+  const toggle = iconButton('nv-controls__toggle');
+  toggle.setAttribute('aria-expanded', String(open));
+
+  bar.append(group, toggle);
   host.appendChild(bar);
 
   let labels: ActivityControlLabels = LABELS.en;
@@ -195,6 +243,21 @@ export function mountActivityControls(
     more.innerHTML = svg(ICONS.more);
     more.title = labels.more;
     more.setAttribute('aria-label', labels.more);
+
+    // The arrow points where the options are: left or down when closed, back to
+    // the corner right or up when open.
+    toggle.innerHTML = svg(
+      open
+        ? vertical
+          ? ICONS.chevronUp
+          : ICONS.chevronRight
+        : vertical
+          ? ICONS.chevronDown
+          : ICONS.chevronLeft,
+    );
+    toggle.title = open ? labels.collapse : labels.expand;
+    toggle.setAttribute('aria-label', toggle.title);
+    toggle.setAttribute('aria-expanded', String(open));
   };
 
   const apply = (next: ActivityControls, fromHost = false) => {
@@ -208,6 +271,12 @@ export function mountActivityControls(
     bar.hidden = false;
     render();
   };
+
+  toggle.addEventListener('click', () => {
+    open = !open;
+    bar.classList.toggle('nv-controls--collapsed', !open);
+    render();
+  });
 
   close.addEventListener('click', () => sdk.ui.close());
   pin.addEventListener('click', () => (controls.pinned ? sdk.ui.unpin() : sdk.ui.pin()));
