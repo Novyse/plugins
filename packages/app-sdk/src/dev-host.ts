@@ -26,6 +26,13 @@
  *   before a tab opens is not there for it, reload the uploader instead.
  */
 import type { ActionEvent, AppSDK, InitPayload, StateEvent, Uuid } from './index';
+import {
+  DEFAULT_THEME_COLORS,
+  normalizeTheme,
+  type ThemeColors,
+  type ThemeMode,
+  type ThemeState,
+} from './theme';
 
 export interface DevHostOptions {
   slug: string;
@@ -41,6 +48,17 @@ export interface DevHostOptions {
    * and then to the language of the browser.
    */
   locale?: string;
+  /**
+   * Theme of the fake host. Defaults to `?theme=` of the page and then to the
+   * preference of the browser.
+   */
+  theme?: ThemeMode;
+  /**
+   * Palette of the fake host, in the order of `THEME_COLOR_NAMES`.
+   * Defaults to `?colors=` (comma separated) and then to
+   * `DEFAULT_THEME_COLORS` for the active mode.
+   */
+  themeColors?: ThemeColors;
 }
 
 type Message =
@@ -74,6 +92,18 @@ export function installDevHost(options: DevHostOptions): void {
   const streamListeners = new Set<(sender: Uuid, bytes: Uint8Array) => void>();
   const participantsListeners = new Set<(participants: Uuid[]) => void>();
   const endedListeners = new Set<(reason: 'stopped' | 'host-gone') => void>();
+  const themeListeners = new Set<(theme: ThemeState) => void>();
+
+  let themeState = devTheme(options);
+
+  // No palette of the app exists here: when the user switches the system
+  // theme, the fake host answers exactly like the app does, so `onTheme` and
+  // the `--nv-*` variables can be checked in `npm run dev`.
+  const colorScheme = window.matchMedia?.('(prefers-color-scheme: dark)');
+  colorScheme?.addEventListener?.('change', () => {
+    themeState = devTheme(options);
+    for (const listener of themeListeners) listener(themeState);
+  });
 
   let events: StateEvent[] = [];
   let initPromise: Promise<InitPayload> | null = null;
@@ -194,6 +224,8 @@ export function installDevHost(options: DevHostOptions): void {
             readOnly: false,
             capabilities: ['stream', 'fullscreen', 'network'],
             locale: options.locale ?? devLocale(),
+            theme: themeState.theme,
+            themeColors: themeState.themeColors,
             state: {
               seq: events.reduce((max, event) => Math.max(max, event.seq), 0),
               truncated: false,
@@ -214,6 +246,11 @@ export function installDevHost(options: DevHostOptions): void {
     onEnded(callback) {
       endedListeners.add(callback);
       return () => endedListeners.delete(callback);
+    },
+
+    onTheme(callback) {
+      themeListeners.add(callback);
+      return () => themeListeners.delete(callback);
     },
 
     state: {
@@ -404,4 +441,32 @@ function devLocale(): string {
   if (fromQuery) return fromQuery;
 
   return navigator.language || 'en';
+}
+
+/** `?theme=light` wins, then the option, then the browser preference. */
+function devTheme(options: DevHostOptions): ThemeState {
+  const query = new URLSearchParams(window.location.search);
+  const requested = query.get('theme');
+  const mode: ThemeMode =
+    requested === 'light' || requested === 'dark'
+      ? requested
+      : options.theme ??
+        (window.matchMedia?.('(prefers-color-scheme: light)').matches ? 'light' : 'dark');
+  const colors = options.themeColors ?? parseThemeColors(query.get('colors'));
+
+  return colors
+    ? normalizeTheme(mode, colors)
+    : { theme: mode, themeColors: DEFAULT_THEME_COLORS[mode] };
+}
+
+/** `?colors=%23f5f9ff,%23f1f6ff,…`, in the order of `THEME_COLOR_NAMES`. */
+function parseThemeColors(raw: string | null): ThemeColors | null {
+  if (!raw) return null;
+
+  const colors = raw
+    .split(',')
+    .map((color) => color.trim())
+    .filter(Boolean);
+
+  return colors.length > 0 ? colors : null;
 }
