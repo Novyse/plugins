@@ -534,14 +534,6 @@ export function App() {
     closeTransfer();
   };
 
-  const requestFullscreen = () => {
-    try {
-      sdk.ui.requestFullscreen();
-    } catch {
-      // The host may refuse: the wheel keeps working in the tile.
-    }
-  };
-
   const formatClock = (at: number): string => {
     if (!at) return '';
 
@@ -580,15 +572,6 @@ export function App() {
             </button>
           ) : null}
 
-          <button
-            type="button"
-            class="icon-button"
-            title={t.fullscreen}
-            aria-label={t.fullscreen}
-            onClick={requestFullscreen}
-          >
-            <ExpandIcon />
-          </button>
         </div>
       </header>
 
@@ -1112,21 +1095,6 @@ function describe(cause: unknown): string {
   }
 
   return String(cause);
-}
-
-function ExpandIcon() {
-  return (
-    <svg viewBox="0 0 24 24" width="16" height="16" aria-hidden="true">
-      <path
-        d="M4 9V4h5M20 9V4h-5M4 15v5h5M20 15v5h-5"
-        fill="none"
-        stroke="currentColor"
-        strokeWidth={1.8}
-        strokeLinecap="round"
-        strokeLinejoin="round"
-      />
-    </svg>
-  );
 }
 
 function PanelIcon() {
