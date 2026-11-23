@@ -1,7 +1,12 @@
 import { useCallback, useEffect, useRef, useState, type ComponentProps } from 'react';
 
 import { Excalidraw } from '@excalidraw/excalidraw';
-import { getAppSDK, type InitPayload, type StateEvent } from '@novyse/app-sdk';
+import {
+  getAppSDK,
+  type InitPayload,
+  type StateEvent,
+  type ThemeMode,
+} from '@novyse/app-sdk';
 
 import { Board } from './board';
 import { messagesFor, normalizeLocale, type Locale, type Messages } from './i18n';
@@ -104,6 +109,7 @@ export function App() {
   const sdk = getAppSDK();
 
   const [init, setInit] = useState<InitPayload | null>(null);
+  const [theme, setTheme] = useState<ThemeMode>('light');
   const [locale, setLocale] = useState<Locale>(() => normalizeLocale(navigator.language));
   const [error, setError] = useState<string | null>(null);
   const [ended, setEnded] = useState(false);
@@ -630,6 +636,8 @@ export function App() {
     });
 
     const offEnded = sdk.onEnded(() => setEnded(true));
+    const offTheme =
+      sdk.onTheme?.((next) => setTheme(next.theme === 'light' ? 'light' : 'dark')) ?? (() => {});
 
     sdk
       .init()
@@ -663,6 +671,7 @@ export function App() {
 
         setInit(payload);
         setLocale(normalizeLocale(payload.locale));
+        setTheme(payload.theme === 'light' ? 'light' : 'dark');
 
         const queued = queuedRef.current;
         queuedRef.current = [];
@@ -678,6 +687,7 @@ export function App() {
       for (const off of offs) off();
       offParticipants();
       offEnded();
+      offTheme();
     };
   }, [sdk]);
 
@@ -693,7 +703,7 @@ export function App() {
       self: init.self,
       // The stroke of the room is drawn by the overlay, with one width and the
       // color of the theme: the element itself is never previewed.
-      theme: init.theme === 'dark' ? 'dark' : 'light',
+      theme,
     });
 
     presence.setViewport(viewportRef.current);
@@ -704,7 +714,7 @@ export function App() {
       presence.detach();
       presenceRef.current = null;
     };
-  }, [init, sdk]);
+  }, [init, sdk, theme]);
 
   // -------------------------------------------------------------------- view
 
@@ -722,7 +732,7 @@ export function App() {
     <main className="board">
       <div ref={canvasRef} className="board__canvas">
         <Excalidraw
-          theme={init.theme === 'dark' ? 'dark' : 'light'}
+          theme={theme}
           langCode={locale === 'it' ? 'it-IT' : 'en'}
           initialData={initialSceneRef.current}
           viewModeEnabled={passive}

@@ -7,7 +7,7 @@ body,
 }
 
 body {
-  background: #ffffff;
+  background: var(--nv-background, #ffffff);
   overscroll-behavior: none;
 }
 
@@ -20,7 +20,7 @@ body {
 .board--loading {
   display: grid;
   place-items: center;
-  color: #6b6b6b;
+  color: var(--nv-muted, #6b6b6b);
   font-size: 13px;
   padding: 0 24px;
   text-align: center;
@@ -60,14 +60,14 @@ body {
 
 .board__error {
   bottom: 12px;
-  background: #fff5f5;
-  color: #c92a2a;
-  border: 1px solid #ffc9c9;
+  background: var(--nv-surface, #fff5f5);
+  color: var(--nv-danger, #c92a2a);
+  border: 1px solid var(--nv-line, #ffc9c9);
 }
 
 .board__banner {
   top: 42px;
-  background: #f1f3f5;
-  color: #495057;
-  border: 1px solid #dee2e6;
+  background: var(--nv-surface, #f1f3f5);
+  color: var(--nv-muted, #495057);
+  border: 1px solid var(--nv-line, #dee2e6);
 }
