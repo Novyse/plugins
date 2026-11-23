@@ -1,0 +1,15 @@
+{
+  "id": "wheel",
+  "name": "Wheel",
+  "description": "A shared wheel of fortune: the options belong to the room and everyone sees the same result.",
+  "version": "0.1.0",
+  "author": {
+    "name": "Novyse",
+    "url": "https://github.com/Novyse"
+  },
+  "capabilities": ["fullscreen"],
+  "locales": ["en", "it"],
+  "permissions": {
+    "channels": ["state"]
+  }
+}
