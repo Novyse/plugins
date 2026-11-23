@@ -42,11 +42,15 @@ body {
   --accent: var(--nv-primary, #5a9cff);
   --accent-soft: var(--nv-primary-soft, rgba(90, 156, 255, 0.16));
   --danger: var(--nv-danger, #e45757);
+  --radius-xs: calc(var(--nv-radius-sm, 8px) * 0.75);
+  --radius-sm: var(--nv-radius-sm, 8px);
+  --radius-md: var(--nv-radius-md, 16px);
+  --radius-lg: var(--nv-radius-lg, 24px);
 
   box-sizing: border-box;
   height: 100%;
-  display: flex;
-  flex-direction: column;
+  display: grid;
+  grid-template-rows: auto auto minmax(0, 1fr) auto;
   gap: clamp(8px, 2.2vmin, 14px);
   padding: clamp(10px, 3vmin, 22px);
   overflow-y: auto;
@@ -124,7 +128,7 @@ body {
   display: grid;
   place-items: center;
   border: 1px solid var(--line);
-  border-radius: 9px;
+  border-radius: var(--radius-sm);
   background: var(--surface);
   color: var(--muted);
   cursor: pointer;
@@ -143,7 +147,7 @@ body {
   gap: 4px;
   padding: 3px;
   border: 1px solid var(--line);
-  border-radius: 10px;
+  border-radius: var(--radius-sm);
   background: var(--surface);
 }
 
@@ -152,7 +156,7 @@ body {
   min-width: 0;
   padding: 7px 6px;
   border: 0;
-  border-radius: 7px;
+  border-radius: var(--radius-xs);
   background: transparent;
   color: var(--muted);
   font: inherit;
@@ -181,10 +185,14 @@ body {
 
 .timer__dial {
   position: relative;
-  flex: 0 0 auto;
-  width: min(50vmin, 280px, 100%);
-  aspect-ratio: 1;
+  width: 100%;
+  height: 100%;
+  min-width: 0;
+  min-height: 0;
+  max-width: 280px;
+  max-height: 280px;
   margin: auto;
+  container-type: size;
 }
 
 .dial {
@@ -221,19 +229,18 @@ body {
 }
 
 .dial__time {
-  font-size: clamp(1.7rem, 9vmin, 3rem);
+  font-size: clamp(0.95rem, 20cqmin, 3rem);
   font-weight: 650;
   line-height: 1;
   letter-spacing: -0.03em;
   font-variant-numeric: tabular-nums;
 }
 
-/* Central picker: the duration replaces the countdown while paused. */
 .dial__editor {
   display: flex;
   align-items: flex-start;
   justify-content: center;
-  gap: clamp(1px, 0.8vmin, 5px);
+  gap: clamp(1px, 1.6cqmin, 5px);
   max-width: 92%;
 }
 
@@ -245,13 +252,13 @@ body {
 }
 
 .time-col__arrow {
-  width: clamp(24px, 5.6vmin, 34px);
-  height: clamp(16px, 3.4vmin, 22px);
+  width: clamp(16px, 15cqmin, 34px);
+  height: clamp(11px, 9cqmin, 22px);
   display: grid;
   place-items: center;
   padding: 0;
   border: 0;
-  border-radius: 6px;
+  border-radius: var(--radius-xs);
   background: transparent;
   color: var(--muted);
   cursor: pointer;
@@ -275,14 +282,14 @@ body {
 }
 
 .time-col__value {
-  width: clamp(38px, 8vmin, 58px);
+  width: clamp(20px, 21cqmin, 58px);
   padding: 0;
   border: 0;
-  border-radius: 8px;
+  border-radius: var(--radius-sm);
   background: transparent;
   color: var(--text);
   font: inherit;
-  font-size: clamp(1.45rem, 7vmin, 2.55rem);
+  font-size: clamp(0.8rem, 16cqmin, 2.55rem);
   font-weight: 650;
   line-height: 1.05;
   letter-spacing: -0.03em;
@@ -303,23 +310,23 @@ body {
 .time-col__unit {
   margin-top: 2px;
   color: var(--muted);
-  font-size: 9px;
+  font-size: clamp(6px, 5.4cqmin, 9px);
   font-weight: 700;
   text-transform: uppercase;
   letter-spacing: 0.12em;
 }
 
 .dial__colon {
-  margin-top: clamp(16px, 3.4vmin, 23px);
+  margin-top: clamp(10px, 12cqmin, 23px);
   color: var(--muted);
-  font-size: clamp(1.35rem, 6.2vmin, 2.2rem);
+  font-size: clamp(0.75rem, 14cqmin, 2.2rem);
   font-weight: 650;
   line-height: 1;
 }
 
 .dial__state {
   color: var(--muted);
-  font-size: 10.5px;
+  font-size: clamp(6.5px, 6cqmin, 10.5px);
   text-transform: uppercase;
   letter-spacing: 0.12em;
 }
@@ -335,7 +342,7 @@ body {
   min-width: 84px;
   padding: 9px 12px;
   border: 1px solid var(--line);
-  border-radius: 10px;
+  border-radius: var(--radius-sm);
   background: var(--surface);
   color: var(--text);
   font: inherit;
@@ -376,7 +383,7 @@ body {
   margin: 0;
   padding: 6px 9px;
   border: 1px solid var(--line);
-  border-radius: 8px;
+  border-radius: var(--radius-sm);
   background: var(--surface);
   color: var(--muted);
   font-size: 11px;
@@ -408,31 +415,6 @@ input:focus-visible {
   }
 }
 
-@media (max-height: 520px) {
-  .timer[data-editing="true"] .timer__dial {
-    width: min(34vh, 180px);
-  }
-
-  .dial__editor {
-    gap: 1px;
-  }
-
-  .time-col__value {
-    width: clamp(32px, 7vh, 46px);
-    font-size: clamp(1.2rem, 6vh, 2rem);
-  }
-
-  .time-col__arrow {
-    width: 26px;
-    height: 16px;
-  }
-
-  .dial__colon {
-    margin-top: 17px;
-    font-size: clamp(1.1rem, 5vh, 1.7rem);
-  }
-}
-
 @media (max-height: 420px) {
   .timer {
     gap: 6px;
@@ -443,35 +425,71 @@ input:focus-visible {
     display: none;
   }
 
-  .timer__dial,
-  .timer[data-editing="true"] .timer__dial {
-    width: min(30vh, 165px);
+  .timer__title {
+    font-size: 14px;
   }
 
-  .dial__time {
-    font-size: clamp(1.25rem, 6vh, 2rem);
+  .icon-button {
+    width: 28px;
+    height: 28px;
+  }
+
+  .phase {
+    padding: 5px 4px;
   }
 
   .timer__controls .button {
     padding: 7px 10px;
   }
+}
 
-  .time-col__value {
-    width: 32px;
-    font-size: 1.25rem;
+@media (max-height: 300px) {
+  .timer {
+    gap: 4px;
+    padding: 7px;
   }
 
-  .time-col__arrow {
-    width: 24px;
-    height: 14px;
+  .timer__title {
+    font-size: 13px;
   }
 
-  .time-col__unit {
-    font-size: 8px;
+  .icon-button {
+    width: 26px;
+    height: 26px;
   }
 
-  .dial__colon {
-    margin-top: 15px;
-    font-size: 1.2rem;
+  .timer__phases {
+    padding: 2px;
+  }
+
+  .phase {
+    padding: 4px 3px;
+    font-size: 10.5px;
+  }
+
+  .timer__controls .button {
+    padding: 6px 8px;
+    font-size: 11.5px;
+  }
+
+  .banner {
+    padding: 4px 7px;
+    font-size: 10px;
+  }
+}
+
+@media (max-width: 300px) {
+  .timer {
+    gap: 6px;
+    padding: 8px;
+  }
+
+  .timer__subtitle {
+    display: none;
+  }
+
+  .button {
+    min-width: 62px;
+    font-size: 12px;
   }
 }
