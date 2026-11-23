@@ -2,6 +2,7 @@ import './assets';
 
 import { createRoot } from 'react-dom/client';
 
+import { watchTheme } from '@novyse/app-sdk';
 import { installDevHost } from '@novyse/app-sdk/dev';
 
 import '@excalidraw/excalidraw/index.css';
@@ -14,7 +15,7 @@ import { messagesFor, normalizeLocale } from './i18n';
 // tabs are two participants and a third tab is the late joiner. A build drops
 // this branch, and the real `window.AppSDK` of the app is used instead.
 if (import.meta.env.DEV) {
-  installDevHost({ slug: 'excalidraw', version: '0.2.0' });
+  installDevHost({ slug: 'excalidraw', version: '0.2.3' });
 
   // `?readonly=1` exercises the passive view without the app, which is the only
   // way to check it locally.
@@ -25,6 +26,10 @@ if (import.meta.env.DEV) {
     sdk.init = async () => ({ ...(await init()), readOnly: true });
   }
 }
+
+// Default color mode for the chrome around the canvas. Excalidraw owns the
+// colors of the board itself and follows `init().theme` / `onTheme` in App.
+if (window.AppSDK) watchTheme(window.AppSDK);
 
 const root = document.getElementById('root');
 if (!root) throw new Error('Missing #root');
