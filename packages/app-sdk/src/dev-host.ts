@@ -31,6 +31,7 @@ import {
   normalizeTheme,
   type ThemeColors,
   type ThemeMode,
+  type ThemeRadii,
   type ThemeState,
 } from './theme';
 
@@ -59,6 +60,8 @@ export interface DevHostOptions {
    * `DEFAULT_THEME_COLORS` for the active mode.
    */
   themeColors?: ThemeColors;
+  /** Corner radii of the fake host, in CSS pixels. */
+  themeRadii?: ThemeRadii;
 }
 
 type Message =
@@ -226,6 +229,7 @@ export function installDevHost(options: DevHostOptions): void {
             locale: options.locale ?? devLocale(),
             theme: themeState.theme,
             themeColors: themeState.themeColors,
+            themeRadii: themeState.radii,
             state: {
               seq: events.reduce((max, event) => Math.max(max, event.seq), 0),
               truncated: false,
@@ -454,9 +458,7 @@ function devTheme(options: DevHostOptions): ThemeState {
         (window.matchMedia?.('(prefers-color-scheme: light)').matches ? 'light' : 'dark');
   const colors = options.themeColors ?? parseThemeColors(query.get('colors'));
 
-  return colors
-    ? normalizeTheme(mode, colors)
-    : { theme: mode, themeColors: DEFAULT_THEME_COLORS[mode] };
+  return normalizeTheme(mode, colors ?? DEFAULT_THEME_COLORS[mode], options.themeRadii);
 }
 
 /** `?colors=%23f5f9ff,%23f1f6ff,…`, in the order of `THEME_COLOR_NAMES`. */

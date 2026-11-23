@@ -1,4 +1,4 @@
-import type { ThemeColors, ThemeMode, ThemeState } from './theme';
+import type { ThemeColors, ThemeMode, ThemeRadii, ThemeState } from './theme';
 
 /**
  * The contract between a plugin and the Novyse host.
@@ -86,6 +86,16 @@ export interface InitPayload {
    * `DEFAULT_THEME_COLORS`, so a plugin that uses it needs no special case.
    */
   themeColors?: ThemeColors;
+  /**
+   * Corner radii of the host, in CSS pixels: `sm` for controls, `md` for
+   * cards and panels, `lg` for dialogs and sheets.
+   *
+   * `watchTheme` writes them to `--nv-radius-sm`, `--nv-radius-md` and
+   * `--nv-radius-lg`, and keeps them live with the rest of the palette. The
+   * app always sends them; older builds omit the field, so a plugin keeps its
+   * own fallback (`var(--nv-radius-md, 16px)`).
+   */
+  themeRadii?: ThemeRadii;
   state: {
     /** Last sequence number assigned to the activity. */
     seq: number;
@@ -220,15 +230,21 @@ export type {
   ThemeColorName,
   ThemeColors,
   ThemeMode,
+  ThemeRadiusName,
+  ThemeRadii,
   ThemeState,
 } from './theme';
 export {
   DEFAULT_THEME_COLORS,
+  DEFAULT_THEME_RADII,
   THEME_COLOR_NAMES,
   THEME_COLOR_VARIABLES,
+  THEME_RADIUS_VARIABLES,
   applyThemeColors,
+  applyThemeRadii,
   defaultThemeMode,
   isThemeColors,
+  isThemeRadii,
   normalizeTheme,
   setThemeMode,
   themeFromPayload,
