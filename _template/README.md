@@ -80,6 +80,10 @@ color: var(--nv-text, #f5f5f5);
 <button class="bg-[var(--nv-primary,#0284c7)] text-[var(--nv-on-primary,#ffffff)]">
 ```
 
+The corner radius travels with the palette, as `themeRadii`: `--nv-radius-sm`
+for controls, `--nv-radius-md` for cards and `--nv-radius-lg` for sheets, so
+`border-radius: var(--nv-radius-md, 16px)` curves like the app.
+
 `src/main.tsx` calls `watchTheme(getAppSDK())` once. In development the dev
 host sends `DEFAULT_THEME_COLORS`, so nothing special is needed; `?theme=light`
 previews the light palette. The full slot table is in the root README.

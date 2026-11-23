@@ -4,6 +4,7 @@ A shared wheel of fortune for the voice room: write the options once, spin, and 
 
 ## How to use it
 
+- The wheel starts empty: the options belong to the room, so there is no stock list to delete first.
 - Add, remove, hide, sort or shuffle the options in the list on the right. The eye keeps an option in the list but off the wheel; the crossed eye brings it back.
 - **Clear** empties the wheel only after a confirmation, so a misclick does not cancel the game.
 - **On win** decides what happens to the winner as soon as the result appears: **Keep**, **Hide** (it stays in the list but leaves the wheel) or **Remove** (it is deleted). The change reaches every client.
