@@ -369,7 +369,7 @@ export function App() {
 
   if (!snapshot || screen === 'input') {
     return (
-      <main class="flex h-full items-center justify-center bg-black px-5 text-neutral-100">
+      <main class="flex h-full items-center justify-center bg-[var(--nv-background,#000)] px-5 text-[var(--nv-text,#f5f5f5)]">
         <div class="w-full max-w-md">
           <form
             onSubmit={(event) => {
@@ -377,9 +377,9 @@ export function App() {
               void submit();
             }}
           >
-            <div class="flex items-center gap-2 rounded-full border border-neutral-800 bg-neutral-900 py-1.5 pl-4 pr-1.5 focus-within:border-neutral-600">
+            <div class="flex items-center gap-2 rounded-full border border-[var(--nv-line,#262626)] bg-[var(--nv-surface,#171717)] py-1.5 pl-4 pr-1.5 focus-within:border-[var(--nv-outline,#525252)]">
               <input
-                class="min-w-0 flex-1 bg-transparent text-sm outline-none placeholder:text-neutral-600 disabled:opacity-60"
+                class="min-w-0 flex-1 bg-transparent text-sm outline-none placeholder:text-[var(--nv-muted,#a3a3a3)] disabled:opacity-60"
                 placeholder={t.placeholder}
                 value={link}
                 disabled={readOnly}
@@ -394,7 +394,7 @@ export function App() {
                 type="submit"
                 aria-label={t.watch}
                 disabled={readOnly}
-                class="flex h-8 w-8 shrink-0 items-center justify-center rounded-full bg-neutral-800 text-neutral-300 transition hover:bg-neutral-700 disabled:opacity-30"
+                class="flex h-8 w-8 shrink-0 items-center justify-center rounded-full bg-[var(--nv-surface-hover,#262626)] text-[var(--nv-muted,#a3a3a3)] transition hover:bg-[var(--nv-field,#404040)] disabled:opacity-30"
               >
                 <svg
                   viewBox="0 0 24 24"
@@ -413,13 +413,13 @@ export function App() {
 
             <p class="mt-3 h-4 text-center text-[11px]">
               {shownError ? (
-                <span class="text-red-400">{shownError}</span>
+                <span class="text-[var(--nv-danger,#f87171)]">{shownError}</span>
               ) : detected ? (
-                <span class="text-neutral-500">
+                <span class="text-[var(--nv-muted,#a3a3a3)]">
                   {t.detected(platformName(detected, t))}
                 </span>
               ) : (
-                <span class="text-neutral-600">
+                <span class="text-[var(--nv-muted,#a3a3a3)] opacity-70">
                   {readOnly ? t.readOnlyHint : t.hint}
                 </span>
               )}
@@ -431,7 +431,7 @@ export function App() {
           {snapshot ? (
             <button
               type="button"
-              class="mx-auto mt-4 block text-[11px] text-neutral-500 underline-offset-2 transition hover:text-neutral-200 hover:underline"
+              class="mx-auto mt-4 block text-[11px] text-[var(--nv-muted,#a3a3a3)] underline-offset-2 transition hover:text-[var(--nv-text,#f5f5f5)] hover:underline"
               onClick={() => {
                 setEmbedError(null);
                 setLinkError(null);
@@ -455,18 +455,18 @@ export function App() {
           <div class="grid h-full place-items-center px-6 text-center">
             {embedError ? (
               <div class="max-w-xs">
-                <p class="text-[11px] text-red-300">{embedError}</p>
-                <p class="mt-1 text-[11px] text-neutral-500">{t.fileNeedsApp}</p>
+                <p class="text-[11px] text-[var(--nv-danger,#f87171)]">{embedError}</p>
+                <p class="mt-1 text-[11px] text-[var(--nv-muted,#a3a3a3)]">{t.fileNeedsApp}</p>
                 <button
                   type="button"
-                  class="mt-3 rounded-md bg-neutral-800 px-3 py-1.5 text-[11px] text-neutral-200"
+                  class="mt-3 rounded-md bg-[var(--nv-surface-hover,#262626)] px-3 py-1.5 text-[11px] text-[var(--nv-text,#f5f5f5)]"
                   onClick={backToInput}
                 >
                   {t.chooseAnother}
                 </button>
               </div>
             ) : (
-              <p class="text-[11px] text-neutral-500">{t.playingInApp}</p>
+              <p class="text-[11px] text-[var(--nv-muted,#a3a3a3)]">{t.playingInApp}</p>
             )}
           </div>
         ) : (
@@ -478,11 +478,11 @@ export function App() {
 
             {embedError ? (
               <div class="absolute inset-0 grid place-items-center bg-black px-5 text-center">
-                <p class="text-[11px] text-red-300">{embedError}</p>
+                <p class="text-[11px] text-[var(--nv-danger,#f87171)]">{embedError}</p>
               </div>
             ) : !ready ? (
               <div class="pointer-events-none absolute inset-0 grid place-items-center bg-black">
-                <p class="text-[11px] text-neutral-500">{t.loading}</p>
+                <p class="text-[11px] text-[var(--nv-muted,#a3a3a3)]">{t.loading}</p>
               </div>
             ) : null}
           </>
