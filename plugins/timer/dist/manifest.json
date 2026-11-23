@@ -3,7 +3,7 @@
   "id": "timer",
   "name": "Timer",
   "description": "A shared timer for the room: focus or short break, with a duration up to 99 hours.",
-  "version": "0.1.2",
+  "version": "0.1.3",
   "entry": "index.html",
   "capabilities": [
     "fullscreen"
