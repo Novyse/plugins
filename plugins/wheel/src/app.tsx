@@ -65,7 +65,12 @@ export function App() {
   const [resultVisible, setResultVisible] = useState(false);
   const [confirmClear, setConfirmClear] = useState(false);
   const [panel, setPanel] = useState<Panel>('options');
-  const [panelOpen, setPanelOpen] = useState(true);
+  // A tile can be much smaller than a browser window: next to a 300 px panel
+  // the wheel has no room left, so the panel starts collapsed there and the
+  // header button brings it back.
+  const [panelOpen, setPanelOpen] = useState(
+    () => window.innerWidth >= 560 && window.innerHeight >= 400,
+  );
   const [transferOpen, setTransferOpen] = useState(false);
   const [transferMode, setTransferMode] = useState<TransferMode>('export');
   const [transferText, setTransferText] = useState('');
