@@ -11,14 +11,14 @@
         "url": "https://github.com/Novyse"
       },
       "description": "Watch YouTube, Twitch or a video file together, in sync, from inside the voice room.",
-      "version": "0.2.13",
-      "tag": "watch-together@0.2.13",
+      "version": "0.2.14",
+      "tag": "watch-together@0.2.14",
       "icon": "plugins/watch-together/store/icon.png",
       "banner": "plugins/watch-together/store/banner.png",
       "entry": "plugins/watch-together/dist/index.html",
       "bundle": "watch-together-bundle.zip",
-      "sha256": "534708eec664a7cdd5919c147caeba6b1f6661a4de7a4ac92c751577d000714e",
-      "sizeBytes": 63939,
+      "sha256": "eba91b1ffb0164fd2c1fb01243292089966b7f3f85320e6bdb420f63f84c8e9b",
+      "sizeBytes": 63961,
       "capabilities": [
         "network"
       ],
