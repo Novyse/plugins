@@ -17,8 +17,7 @@ if (import.meta.env.DEV) {
 // host sends the stock palette; `?theme=light` previews the light one.
 watchTheme(getAppSDK());
 
-// Close, pin, fullscreen and the context menu belong to the tile, not to a
-// rail of the app: the SDK draws them over the 16:9 surface.
+
 mountActivityControls(getAppSDK());
 
 render(<App />, document.getElementById('app')!);
