@@ -3,7 +3,7 @@
   "id": "wheel",
   "name": "Wheel",
   "description": "A shared wheel of fortune: the options belong to the room and everyone sees the same result.",
-  "version": "0.1.2",
+  "version": "0.1.3",
   "entry": "index.html",
   "capabilities": [
     "fullscreen"

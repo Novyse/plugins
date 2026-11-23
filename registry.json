@@ -46,14 +46,14 @@
         "url": "https://github.com/Novyse"
       },
       "description": "A shared Excalidraw whiteboard, one per voice room: everyone draws on the same board, every stroke in sync.",
-      "version": "0.2.12",
-      "tag": "excalidraw@0.2.12",
+      "version": "0.2.13",
+      "tag": "excalidraw@0.2.13",
       "icon": "plugins/excalidraw/store/icon.png",
       "banner": "plugins/excalidraw/store/banner.png",
       "entry": "plugins/excalidraw/dist/index.html",
       "bundle": "excalidraw-bundle.zip",
-      "sha256": "a8fdf2cc23abd81cd06e85735e8e2824cf66699bc7a6a39a3ce6278e788abc28",
-      "sizeBytes": 7679899,
+      "sha256": "57b27a54acdc21be430397b44e1e36a16ddddfe56e89d4dda0a183cd0fafd533",
+      "sizeBytes": 7681583,
       "capabilities": [
         "stream"
       ],
@@ -78,12 +78,14 @@
         "url": "https://github.com/Novyse"
       },
       "description": "A shared timer for the room: focus or short break, with a duration up to 99 hours.",
-      "version": "0.1.2",
-      "tag": "timer@0.1.2",
+      "version": "0.1.3",
+      "tag": "timer@0.1.3",
+      "icon": "plugins/timer/store/icon.png",
+      "banner": "plugins/timer/store/banner.png",
       "entry": "plugins/timer/dist/index.html",
       "bundle": "timer-bundle.zip",
-      "sha256": "adddc7e6ed82affe237f3a944e8d61c6f57aa2659db0cea6a7534e7296e7f0d8",
-      "sizeBytes": 47329,
+      "sha256": "fa4002088b9f4cafe0f4beccaf0481dee65d756fcc0e8f2b78e126f6ffc01158",
+      "sizeBytes": 49009,
       "capabilities": [
         "fullscreen"
       ],
@@ -105,12 +107,13 @@
         "url": "https://github.com/Novyse"
       },
       "description": "A shared wheel of fortune: the options belong to the room and everyone sees the same result.",
-      "version": "0.1.2",
-      "tag": "wheel@0.1.2",
+      "version": "0.1.3",
+      "tag": "wheel@0.1.3",
+      "banner": "plugins/wheel/store/banner.png",
       "entry": "plugins/wheel/dist/index.html",
       "bundle": "wheel-bundle.zip",
-      "sha256": "5b42a6c9b43075ff230b244daf504e55bfcf52cbcfe78544bbba9e6010a16ca1",
-      "sizeBytes": 65854,
+      "sha256": "10bf54e6c7a1b094e8011758a53a07cfdd76c261cf095ec21293860f8e695794",
+      "sizeBytes": 67535,
       "capabilities": [
         "fullscreen"
       ],
