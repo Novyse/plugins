@@ -1,3 +1,5 @@
+import type { ThemeColors, ThemeMode, ThemeState } from './theme';
+
 /**
  * The contract between a plugin and the Novyse host.
  *
@@ -64,9 +66,26 @@ export interface InitPayload {
    */
   locale: string;
   /**
-   * The theme the host is drawn in.
+   * The theme the host is drawn in: the theme type.
+   *
+   * `system` is already resolved here. A plugin can keep its own palette in
+   * CSS and switch on this value with `watchThemeMode`.
    */
-  theme?: 'light' | 'dark';
+  theme?: ThemeMode;
+  /**
+   * The palette of the host, computed from the theme mode, the selected
+   * palette and the surface treatment of the app.
+   *
+   * This is the default way to color a plugin. The array is positional: the
+   * order is `THEME_COLOR_NAMES` (`background`, `surface`, `surfaceHover`,
+   * `field`, `line`, `outline`, `text`, `muted`, `primary`, `onPrimary`,
+   * `primarySoft`, `danger`, `success`, `warning`, `info`). `watchTheme` writes
+   * it to the `--nv-*` CSS custom properties and keeps it up to date.
+   *
+   * The app always sends it. In development the dev host sends
+   * `DEFAULT_THEME_COLORS`, so a plugin that uses it needs no special case.
+   */
+  themeColors?: ThemeColors;
   state: {
     /** Last sequence number assigned to the activity. */
     seq: number;
@@ -100,6 +119,17 @@ export interface AppSDK {
 
   /** The activity was stopped, or the host went away. */
   onEnded(callback: (reason: 'stopped' | 'host-gone') => void): () => void;
+
+  /**
+   * The user changed the theme, the palette or the surface treatment.
+   *
+   * The host pushes the new palette while the activity runs, so a plugin does
+   * not have to be reloaded to follow the app. `watchTheme` and
+   * `watchThemeMode` subscribe here; use this directly only for something they
+   * cannot express, and fall back to `init().theme` when the app is older than
+   * the plugin and the member is missing.
+   */
+  onTheme(callback: (theme: ThemeState) => void): () => void;
 
   state: {
     /**
@@ -185,6 +215,26 @@ export interface AppSDK {
 
   log(level: 'debug' | 'info' | 'warn' | 'error', ...args: unknown[]): void;
 }
+
+export type {
+  ThemeColorName,
+  ThemeColors,
+  ThemeMode,
+  ThemeState,
+} from './theme';
+export {
+  DEFAULT_THEME_COLORS,
+  THEME_COLOR_NAMES,
+  THEME_COLOR_VARIABLES,
+  applyThemeColors,
+  defaultThemeMode,
+  isThemeColors,
+  normalizeTheme,
+  setThemeMode,
+  themeFromPayload,
+  watchTheme,
+  watchThemeMode,
+} from './theme';
 
 declare global {
   interface Window {
