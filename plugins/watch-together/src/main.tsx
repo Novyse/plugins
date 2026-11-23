@@ -1,6 +1,6 @@
 import { render } from 'preact';
 
-import { getAppSDK, watchTheme } from '@novyse/app-sdk';
+import { getAppSDK, mountActivityControls, watchTheme } from '@novyse/app-sdk';
 import { installDevHost } from '@novyse/app-sdk/dev';
 
 import { App } from './app';
@@ -16,5 +16,9 @@ if (import.meta.env.DEV) {
 // `--nv-*` custom properties and kept in sync live. In development the dev
 // host sends the stock palette; `?theme=light` previews the light one.
 watchTheme(getAppSDK());
+
+// Close, pin, fullscreen and the context menu belong to the tile, not to a
+// rail of the app: the SDK draws them over the 16:9 surface.
+mountActivityControls(getAppSDK());
 
 render(<App />, document.getElementById('app')!);
