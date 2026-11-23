@@ -396,9 +396,10 @@ export function App() {
               />
 
               <button
-                type="submit"
+                type="button"
                 aria-label={t.watch}
                 disabled={readOnly}
+                onClick={() => void submit()}
                 class="flex h-8 w-8 shrink-0 items-center justify-center rounded-full bg-[var(--nv-surface-hover,#262626)] text-[var(--nv-muted,#a3a3a3)] transition hover:bg-[var(--nv-field,#404040)] disabled:opacity-30"
               >
                 <svg
