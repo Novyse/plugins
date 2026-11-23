@@ -52,7 +52,7 @@ body {
   margin: 0;
   max-width: calc(100% - 24px);
   padding: 6px 12px;
-  border-radius: 8px;
+  border-radius: var(--nv-radius-md, 16px);
   font-family: ui-sans-serif, system-ui, sans-serif;
   font-size: 11px;
   text-align: center;
