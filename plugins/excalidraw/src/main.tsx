@@ -31,8 +31,7 @@ if (import.meta.env.DEV) {
 // colors of the board itself and follows `init().theme` / `onTheme` in App.
 if (window.AppSDK) watchTheme(window.AppSDK);
 
-// Close, pin, fullscreen and the context menu belong to the tile, not to a
-// rail of the app: the SDK draws them over the 16:9 surface.
+
 if (window.AppSDK) mountActivityControls(window.AppSDK);
 
 const root = document.getElementById('root');
