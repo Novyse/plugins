@@ -64,6 +64,32 @@ system.
 
 Add a language by adding it to `plugin.json`, to `LOCALES` and to the tables.
 
+## Colors and theming
+
+The template uses **`themeColors`**, the default mode: the app sends the
+palette it is drawing with and `watchTheme` writes it to the `--nv-*` custom
+properties, live. Every color in `src/style.css` and in the classes of the app
+reads a token with its own fallback:
+
+```css
+background: var(--nv-background, #0a0a0a);
+color: var(--nv-text, #f5f5f5);
+```
+
+```tsx
+<button class="bg-[var(--nv-primary,#0284c7)] text-[var(--nv-on-primary,#ffffff)]">
+```
+
+`src/main.tsx` calls `watchTheme(getAppSDK())` once. In development the dev
+host sends `DEFAULT_THEME_COLORS`, so nothing special is needed; `?theme=light`
+previews the light palette. The full slot table is in the root README.
+
+If you prefer two palettes written by the plugin, use the theme type instead:
+`watchThemeMode(getAppSDK())` sets `data-novyse-theme` and `color-scheme` on the
+document, and the CSS can branch on `[data-novyse-theme="light"]`. Do not mix
+the two: a theme palette can be the fallback of `var(--nv-…, fallback)`, but the
+host value wins whenever it is present.
+
 ## What the app shows of a plugin
 
 The store card uses `store/banner.png` (1600×600) and the logo `store/icon.png`
