@@ -78,12 +78,12 @@
         "url": "https://github.com/Novyse"
       },
       "description": "A shared timer for the room: focus or short break, with a duration up to 99 hours.",
-      "version": "0.1.0",
-      "tag": "timer@0.1.0",
+      "version": "0.1.1",
+      "tag": "timer@0.1.1",
       "entry": "plugins/timer/dist/index.html",
       "bundle": "timer-bundle.zip",
-      "sha256": "bc6159bda78cf91c8276e0afc8ab668a91135d7b3964cba959d83b0556b6b465",
-      "sizeBytes": 40238,
+      "sha256": "4b63cdc677528db15d192e5da74826604219516e5c8b0290c383a3cd7749af59",
+      "sizeBytes": 41058,
       "capabilities": [
         "fullscreen"
       ],

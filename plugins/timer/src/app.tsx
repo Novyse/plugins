@@ -240,13 +240,20 @@ export function App() {
   const locked = readOnly || ended !== null;
   const canAdjust = !anchor?.running || remaining <= 0;
 
-  // Follow the duration of the room, unless the user is in the middle of a
-  // change that has not been committed yet.
+  // A paused timer shows the time it has left, not the length it started
+  // from: editing here edits the remaining time, and play resumes from it. A
+  // phase that has not run yet (`remaining == durationMs`), or one that is
+  // over, keeps showing the full duration.
+  const editableMs =
+    anchor && !anchor.running && remaining > 0 ? remaining : durationMs;
+
+  // Follow the room, unless the user is in the middle of a change that has
+  // not been committed yet.
   useEffect(() => {
     if (dirtyRef.current) return;
 
-    setDraft(partsOf(durationMs));
-  }, [durationMs, phase]);
+    setDraft(partsOf(editableMs));
+  }, [editableMs, phase]);
 
   const chimeFor = useCallback((key: string) => {
     if (chimeKeyRef.current === key) return;
