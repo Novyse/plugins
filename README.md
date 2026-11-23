@@ -82,6 +82,101 @@ The first frame is rendered before `init()` answers: start from
 does not change with the language (names of the platforms, for example) still
 belongs in the table.
 
+## Colors and theming
+
+A plugin can be colored in two standard ways. **`themeColors` is the default**:
+the app sends the palette it is drawing with, so the tile follows the theme
+mode, the selected palette and the surface treatment (AMOLED included). The
+**theme type** is for a plugin that wants to keep its own palette and only know
+whether the app is light or dark.
+
+### The default: `themeColors`
+
+`init().themeColors` is a positional array computed by the client from its
+`ColorScheme`. The SDK writes it to CSS custom properties:
+
+| # | Name | CSS variable | Used for |
+| :-- | :--- | :--- | :--- |
+| 0 | `background` | `--nv-background` | page background |
+| 1 | `surface` | `--nv-surface` | cards, panels, bars |
+| 2 | `surfaceHover` | `--nv-surface-hover` | hover of a surface |
+| 3 | `field` | `--nv-field` | inputs, code areas |
+| 4 | `line` | `--nv-line` | borders and dividers |
+| 5 | `outline` | `--nv-outline` | tracks, stronger outlines |
+| 6 | `text` | `--nv-text` | primary text |
+| 7 | `muted` | `--nv-muted` | secondary text and icons |
+| 8 | `primary` | `--nv-primary` | the call to action |
+| 9 | `onPrimary` | `--nv-on-primary` | text on `primary` |
+| 10 | `primarySoft` | `--nv-primary-soft` | tinted primary (16% alpha) |
+| 11 | `danger` | `--nv-danger` | errors, destructive actions |
+| 12 | `success` | `--nv-success` | success and "go" states |
+| 13 | `warning` | `--nv-warning` | warnings |
+| 14 | `info` | `--nv-info` | neutral information |
+
+Call the helper once in `main.tsx`, before rendering:
+
+```ts
+import { getAppSDK, watchTheme } from '@novyse/app-sdk';
+
+watchTheme(getAppSDK());
+```
+
+and keep the plugin's own palette as the fallback of every token, so the first
+frame is painted before `init()` answers:
+
+```css
+.panel {
+  background: var(--nv-surface, #0a182f);
+  color: var(--nv-text, #eaf2ff);
+  border: 1px solid var(--nv-line, #1c2a40);
+}
+```
+
+`watchTheme` also subscribes to `sdk.onTheme`: when the user changes the theme,
+the palette or the surface treatment, the app pushes a new array and the CSS
+updates live, without reloading the activity. Pass a listener to redraw
+something that CSS cannot express (a canvas).
+
+On Novyse the array is always present. In development the dev host sends
+`DEFAULT_THEME_COLORS` for the active mode, so `npm run dev` works without the
+app; `?theme=light` switches the sample palette and
+`?colors=%23f5f9ff,%23f1f6ff,...` overrides individual slots. The helper is also
+safe on an app older than the plugin: without `themeColors` it falls back to the
+stock palette of `init().theme`.
+
+### The theme type
+
+A plugin that defines both palettes by itself reads only `init().theme`:
+
+```ts
+import { getAppSDK, watchThemeMode } from '@novyse/app-sdk';
+
+watchThemeMode(getAppSDK());
+```
+
+```css
+:root {
+  --bg: #071427;
+  --text: #eaf2ff;
+}
+
+[data-novyse-theme="light"] {
+  --bg: #f5f9ff;
+  --text: #0e1826;
+}
+```
+
+`watchThemeMode` sets `data-novyse-theme` and `color-scheme` on the document and
+follows the changes live. `sdk.onTheme` is there if something else needs the
+new mode.
+
+Do not mix the two strategies: either define both palettes from `theme`, or use
+`themeColors` and let the app choose. A theme palette can still be the fallback
+of `var(--nv-…, fallback)`; the host value wins when it is present, which is
+always the case inside Novyse. Components with a theme of their own (the
+Excalidraw canvas, for example) take the theme type and use `themeColors` for
+the chrome around them.
+
 ## Capabilities and permissions
 
 Both live in `plugin.json` and reach the store through `registry.json`, so the
