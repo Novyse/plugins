@@ -459,7 +459,7 @@ export function App() {
                 <p class="mt-1 text-[11px] text-[var(--nv-muted,#a3a3a3)]">{t.fileNeedsApp}</p>
                 <button
                   type="button"
-                  class="mt-3 rounded-md bg-[var(--nv-surface-hover,#262626)] px-3 py-1.5 text-[11px] text-[var(--nv-text,#f5f5f5)]"
+                  class="mt-3 rounded-[var(--nv-radius-md,16px)] bg-[var(--nv-surface-hover,#262626)] px-3 py-1.5 text-[11px] text-[var(--nv-text,#f5f5f5)]"
                   onClick={backToInput}
                 >
                   {t.chooseAnother}
