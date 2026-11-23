@@ -105,12 +105,12 @@
         "url": "https://github.com/Novyse"
       },
       "description": "A shared wheel of fortune: the options belong to the room and everyone sees the same result.",
-      "version": "0.1.0",
-      "tag": "wheel@0.1.0",
+      "version": "0.1.1",
+      "tag": "wheel@0.1.1",
       "entry": "plugins/wheel/dist/index.html",
       "bundle": "wheel-bundle.zip",
-      "sha256": "3964a3b4f28fdabe54c6f6677f5d692773d941ad476239107ac57c044e569b54",
-      "sizeBytes": 58104,
+      "sha256": "da6e6e95765b86d780cccc0a842eb38f1b26e296584ceb53194f576985837a7f",
+      "sizeBytes": 59596,
       "capabilities": [
         "fullscreen"
       ],

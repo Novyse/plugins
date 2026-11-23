@@ -58,14 +58,7 @@ export interface WheelAnchor extends WheelSnapshot {
   ts: number;
 }
 
-export const DEFAULT_OPTIONS: WheelOption[] = [
-  'Pizza',
-  'Sushi',
-  'Burger',
-  'Pasta',
-  'Tacos',
-  'Insalata',
-].map((label, index) => ({ id: `default-${index}`, label }));
+export const DEFAULT_OPTIONS: WheelOption[] = [];
 
 /** Piliapp-like rainbow, repeated with a shift when the options pass twelve. */
 const PALETTE = [
