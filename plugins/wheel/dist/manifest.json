@@ -1,0 +1,24 @@
+{
+  "schemaVersion": 1,
+  "id": "wheel",
+  "name": "Wheel",
+  "description": "A shared wheel of fortune: the options belong to the room and everyone sees the same result.",
+  "version": "0.1.0",
+  "entry": "index.html",
+  "capabilities": [
+    "fullscreen"
+  ],
+  "locales": [
+    "en",
+    "it"
+  ],
+  "author": {
+    "name": "Novyse",
+    "url": "https://github.com/Novyse"
+  },
+  "permissions": {
+    "channels": [
+      "state"
+    ]
+  }
+}

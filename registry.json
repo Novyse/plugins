@@ -96,6 +96,33 @@
           "state"
         ]
       }
+    },
+    {
+      "slug": "wheel",
+      "name": "Wheel",
+      "author": {
+        "name": "Novyse",
+        "url": "https://github.com/Novyse"
+      },
+      "description": "A shared wheel of fortune: the options belong to the room and everyone sees the same result.",
+      "version": "0.1.0",
+      "tag": "wheel@0.1.0",
+      "entry": "plugins/wheel/dist/index.html",
+      "bundle": "wheel-bundle.zip",
+      "sha256": "3964a3b4f28fdabe54c6f6677f5d692773d941ad476239107ac57c044e569b54",
+      "sizeBytes": 58104,
+      "capabilities": [
+        "fullscreen"
+      ],
+      "locales": [
+        "en",
+        "it"
+      ],
+      "permissions": {
+        "channels": [
+          "state"
+        ]
+      }
     }
   ]
 }
