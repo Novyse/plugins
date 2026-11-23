@@ -94,6 +94,7 @@ body {
   align-items: flex-start;
   justify-content: space-between;
   gap: 10px;
+  padding-right: clamp(96px, 34vw, 140px);
 }
 
 .timer__heading {
@@ -128,7 +129,7 @@ body {
   display: grid;
   place-items: center;
   border: 1px solid var(--line);
-  border-radius: var(--radius-sm);
+  border-radius: var(--radius-md);
   background: var(--surface);
   color: var(--muted);
   cursor: pointer;
@@ -147,7 +148,7 @@ body {
   gap: 4px;
   padding: 3px;
   border: 1px solid var(--line);
-  border-radius: var(--radius-sm);
+  border-radius: var(--radius-md);
   background: var(--surface);
 }
 
@@ -156,7 +157,7 @@ body {
   min-width: 0;
   padding: 7px 6px;
   border: 0;
-  border-radius: var(--radius-xs);
+  border-radius: var(--radius-sm);
   background: transparent;
   color: var(--muted);
   font: inherit;
@@ -342,7 +343,7 @@ body {
   min-width: 84px;
   padding: 9px 12px;
   border: 1px solid var(--line);
-  border-radius: var(--radius-sm);
+  border-radius: var(--radius-md);
   background: var(--surface);
   color: var(--text);
   font: inherit;
@@ -383,7 +384,7 @@ body {
   margin: 0;
   padding: 6px 9px;
   border: 1px solid var(--line);
-  border-radius: var(--radius-sm);
+  border-radius: var(--radius-md);
   background: var(--surface);
   color: var(--muted);
   font-size: 11px;
