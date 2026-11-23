@@ -114,12 +114,25 @@ whether the app is light or dark.
 | 14 | `info` | `--nv-info` | neutral information |
 
 The corner radius of the app travels with the palette but is not a color, so it
-is not part of the array: `init().themeRadii` carries `sm` (controls), `md`
-(cards, panels) and `lg` (dialogs, sheets) in CSS pixels, and `watchTheme`
-writes them to `--nv-radius-sm`, `--nv-radius-md` and `--nv-radius-lg`.
+is not part of the array: `init().themeRadii` carries `sm`, `md` and `lg` in CSS
+pixels, and `watchTheme` writes them to `--nv-radius-sm`, `--nv-radius-md` and
+`--nv-radius-lg`.
+
+Use the token the app uses for the same kind of widget, or the tile looks
+bolted on next to the rest of the interface:
+
+| Token | Value | Use it for |
+| :-- | :-- | :-- |
+| `--nv-radius-sm` | 8 px | chips, tabs, small inner rows |
+| `--nv-radius-md` | 16 px | buttons, inputs, icon buttons, the toolbar of the activity |
+| `--nv-radius-lg` | 24 px | cards, panels, sheets, dialogs |
 
 ```css
 .panel {
+  border-radius: var(--nv-radius-lg, 24px);
+}
+
+.button {
   border-radius: var(--nv-radius-md, 16px);
 }
 ```
@@ -189,6 +202,41 @@ of `var(--nv-…, fallback)`; the host value wins when it is present, which is
 always the case inside Novyse. Components with a theme of their own (the
 Excalidraw canvas, for example) take the theme type and use `themeColors` for
 the chrome around them.
+
+## The chrome of an activity
+
+An activity is a 16:9 surface: the host draws no rail beside it. Closing,
+pinning, fullscreen and the context menu are buttons of the plugin, over the
+tile, and they call the host through the SDK.
+
+```ts
+import { getAppSDK, mountActivityControls, watchTheme } from '@novyse/app-sdk';
+
+const sdk = getAppSDK();
+watchTheme(sdk);
+mountActivityControls(sdk); // once, in main.tsx
+```
+
+`mountActivityControls` draws a small bar in the top-right corner with the same
+four buttons for every plugin (close, pin, fullscreen, more), coloured with the
+`--nv-*` tokens and rounded with `--nv-radius-md`. It reads `init().controls`
+(`{ pinned, fullscreen, closable }`), follows `ui.onControls` live so the pin
+button flips when the room pins the tile, and translates the labels with the
+language of `init().locale`.
+
+Leave it room: keep the heading of the plugin clear of the top-right corner
+(`padding-right: clamp(96px, 34vw, 140px)` on the header is what the timer and
+the wheel do), and do not draw those four buttons yourself: a plugin with its
+own close button is a plugin that drifts from the app.
+
+The same calls are there for a plugin that wants different buttons:
+
+| Call | What the host does |
+| :-- | :-- |
+| `ui.close()` | stops the activity in the room |
+| `ui.pin()` / `ui.unpin()` | pins the tile over the grid, releases it |
+| `ui.requestFullscreen()` / `ui.exitFullscreen()` | fullscreen needs the `fullscreen` capability |
+| `ui.openMenu(anchor)` | opens the tile context menu under `{ x, y, width, height }`, in CSS pixels of the sandbox |
 
 ## Capabilities and permissions
 

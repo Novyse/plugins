@@ -106,6 +106,30 @@ watchThemeMode(getAppSDK());
 and follows the changes live. Use `sdk.onTheme` directly only for a canvas or
 another surface that CSS cannot color.
 
+## The chrome of an activity
+
+The host keeps no rail beside a tile: the plugin draws close, pin, fullscreen
+and the context menu itself, and the SDK gives it the buttons.
+
+```ts
+import { getAppSDK, mountActivityControls } from '@novyse/app-sdk';
+
+mountActivityControls(getAppSDK());
+```
+
+The bar sits in the top-right corner, colours itself with the `--nv-*` tokens
+and rounds itself with `--nv-radius-md`, follows `init().controls`
+(`{ pinned, fullscreen, closable }`) and `ui.onControls`, and translates its
+labels with the language of `init().locale`. A plugin that wants different
+buttons calls the same methods: `ui.close()`, `ui.pin()`, `ui.unpin()`,
+`ui.requestFullscreen()`, `ui.exitFullscreen()` and
+`ui.openMenu({ x, y, width, height })`, whose rect is in CSS pixels of the
+sandbox: the host opens the context menu of the tile below it.
+
+The dev host answers all of them: pin and fullscreen flip locally, `close()`
+emits `onEnded('stopped')` and `openMenu` only logs, since a tab has no room to
+menu.
+
 ## Development theme
 
 The dev host sends the stock palette of the active mode, so the default mode

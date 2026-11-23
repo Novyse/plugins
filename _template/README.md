@@ -88,6 +88,19 @@ for controls, `--nv-radius-md` for cards and `--nv-radius-lg` for sheets, so
 host sends `DEFAULT_THEME_COLORS`, so nothing special is needed; `?theme=light`
 previews the light palette. The full slot table is in the root README.
 
+Use the same token the app uses for the same widget: `--nv-radius-md` for
+buttons, inputs and icon buttons, `--nv-radius-lg` for cards and panels,
+`--nv-radius-sm` for chips and tabs.
+
+## The chrome of the activity
+
+The SDK puts close, pin, fullscreen and
+the context menu in the top-right corner, follows the state of the host and
+translates itself. Keep the top-right corner of your header free with
+`padding-right: clamp(96px, 34vw, 140px)`, and use `ui.close()`, `ui.pin()`,
+`ui.unpin()`, `ui.requestFullscreen()`, `ui.exitFullscreen()` or
+`ui.openMenu(rect)` if you want your own buttons instead.
+
 If you prefer two palettes written by the plugin, use the theme type instead:
 `watchThemeMode(getAppSDK())` sets `data-novyse-theme` and `color-scheme` on the
 document, and the CSS can branch on `[data-novyse-theme="light"]`. Do not mix
