@@ -16,7 +16,8 @@ body {
     -apple-system,
     "Segoe UI",
     sans-serif;
-  background: #0a0a0a;
+  background: var(--nv-background, #0a0a0a);
+  color: var(--nv-text, #f5f5f5);
   overscroll-behavior: none;
   user-select: none;
   -webkit-user-select: none;

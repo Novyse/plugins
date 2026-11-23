@@ -45,7 +45,7 @@ export function App() {
   const [count, setCount] = useState(0);
   const [pings, setPings] = useState(0);
   const [lastPing, setLastPing] = useState<string | null>(null);
-  const [error, setError] = useState<string | null>(null);.
+  const [error, setError] = useState<string | null>(null);
   const [locale, setLocale] = useState<Locale>(() => normalizeLocale(navigator.language));
   const t = messagesFor(locale);
 
@@ -117,22 +117,22 @@ export function App() {
 
   if (error && !init) {
     return (
-      <main class="flex h-full items-center justify-center p-6 text-center text-sm text-red-300">
+      <main class="flex h-full items-center justify-center p-6 text-center text-sm text-[var(--nv-danger,#f87171)]">
         {error}
       </main>
     );
   }
 
   return (
-    <main class="flex h-full flex-col gap-3 bg-neutral-950 p-4 text-neutral-100">
+    <main class="flex h-full flex-col gap-3 bg-[var(--nv-background,#0a0a0a)] p-4 text-[var(--nv-text,#f5f5f5)]">
       <header class="flex items-baseline justify-between gap-2">
         <h1 class="text-base font-semibold">{t.title}</h1>
-        <span class="text-xs text-neutral-400">
+        <span class="text-xs text-[var(--nv-muted,#a3a3a3)]">
           v{init?.plugin.version ?? '…'}
         </span>
       </header>
 
-      <p class="text-xs text-neutral-400">
+      <p class="text-xs text-[var(--nv-muted,#a3a3a3)]">
         {t.room(init?.room.chatUUID ?? '…', init?.room.subID ?? 0, init?.self ?? '…')}
       </p>
 
@@ -140,19 +140,19 @@ export function App() {
         {participants.map((participant) => (
           <li
             key={participant}
-            class="rounded bg-neutral-800 px-2 py-0.5 text-[11px] text-neutral-300"
+            class="rounded bg-[var(--nv-surface-hover,#262626)] px-2 py-0.5 text-[11px] text-[var(--nv-text,#f5f5f5)]"
           >
             {participant}
           </li>
         ))}
       </ul>
 
-      <section class="flex items-center gap-4 rounded-lg bg-neutral-900 p-3">
+      <section class="flex items-center gap-4 rounded-lg bg-[var(--nv-surface,#171717)] p-3">
         <span class="text-3xl font-semibold tabular-nums">{count}</span>
 
         <button
           type="button"
-          class="rounded-md bg-sky-600 px-3 py-1.5 text-sm font-medium text-white disabled:opacity-40"
+          class="rounded-md bg-[var(--nv-primary,#0284c7)] px-3 py-1.5 text-sm font-medium text-[var(--nv-on-primary,#ffffff)] disabled:opacity-40"
           onClick={increment}
           disabled={readOnly}
         >
@@ -161,20 +161,20 @@ export function App() {
 
         <button
           type="button"
-          class="rounded-md bg-neutral-700 px-3 py-1.5 text-sm font-medium text-white disabled:opacity-40"
+          class="rounded-md bg-[var(--nv-surface-hover,#404040)] px-3 py-1.5 text-sm font-medium text-[var(--nv-text,#f5f5f5)] disabled:opacity-40"
           onClick={ping}
           disabled={readOnly}
         >
           {t.ping}
         </button>
 
-        <span class="ml-auto text-xs text-neutral-400">
+        <span class="ml-auto text-xs text-[var(--nv-muted,#a3a3a3)]">
           {t.pings(pings)}
           {lastPing ? ` · ${t.lastFrom(lastPing)}` : ''}
         </span>
       </section>
 
-      <footer class="mt-auto flex items-center justify-between text-[11px] text-neutral-500">
+      <footer class="mt-auto flex items-center justify-between text-[11px] text-[var(--nv-muted,#a3a3a3)]">
         <span>
           {t.events(init?.state.events.length ?? 0, init?.state.truncated ?? false)}
         </span>
@@ -182,7 +182,7 @@ export function App() {
       </footer>
 
       {error ? (
-        <p class="rounded bg-red-950 px-2 py-1 text-[11px] text-red-300">{error}</p>
+        <p class="rounded border border-[var(--nv-danger,#f87171)] bg-[var(--nv-surface,#171717)] px-2 py-1 text-[11px] text-[var(--nv-danger,#f87171)]">{error}</p>
       ) : null}
     </main>
   );
