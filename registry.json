@@ -84,8 +84,8 @@
       "banner": "plugins/clock/store/banner.png",
       "entry": "plugins/clock/dist/index.html",
       "bundle": "clock-bundle.zip",
-      "sha256": "4b0e7cc4d7523f626126cd77b653753af059defea5db30365e2150fd85e0ca35",
-      "sizeBytes": 56612,
+      "sha256": "ea0fd63e4decf572b8153f161928c1c515d4101e822eefb5cfe6eaa4a9d2ffa3",
+      "sizeBytes": 56646,
       "capabilities": [
         "fullscreen"
       ],
