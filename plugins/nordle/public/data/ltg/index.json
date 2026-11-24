@@ -1,0 +1,54 @@
+{
+  "code": "ltg",
+  "name": "Latgalian",
+  "nativeName": "latgaliski",
+  "keyboard": [
+    [
+      "a",
+      "b",
+      "c",
+      "d",
+      "e",
+      "f",
+      "g",
+      "h",
+      "i",
+      "j",
+      "k",
+      "l"
+    ],
+    [
+      "m",
+      "n",
+      "o",
+      "p",
+      "r",
+      "s",
+      "t",
+      "u",
+      "v",
+      "y",
+      "z"
+    ],
+    [
+      "ENTER",
+      "ā",
+      "č",
+      "ē",
+      "ī",
+      "ķ",
+      "ļ",
+      "ņ",
+      "ō",
+      "š",
+      "ū",
+      "ž",
+      "⌫"
+    ]
+  ],
+  "rtl": false,
+  "availableLengths": [
+    5
+  ],
+  "totalWords": 387
+}

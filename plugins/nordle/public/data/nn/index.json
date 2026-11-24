@@ -1,0 +1,49 @@
+{
+  "code": "nn",
+  "name": "Norwegian Nynorsk",
+  "nativeName": "Norsk Nynorsk",
+  "keyboard": [
+    [
+      "q",
+      "w",
+      "e",
+      "r",
+      "t",
+      "y",
+      "u",
+      "i",
+      "o",
+      "p",
+      "å"
+    ],
+    [
+      "a",
+      "s",
+      "d",
+      "f",
+      "g",
+      "h",
+      "j",
+      "k",
+      "l",
+      "ø",
+      "æ"
+    ],
+    [
+      "ENTER",
+      "z",
+      "x",
+      "c",
+      "v",
+      "b",
+      "n",
+      "m",
+      "⌫"
+    ]
+  ],
+  "rtl": false,
+  "availableLengths": [
+    5
+  ],
+  "totalWords": 2000
+}

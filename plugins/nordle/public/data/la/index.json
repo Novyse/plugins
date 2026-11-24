@@ -1,0 +1,44 @@
+{
+  "code": "la",
+  "name": "Latin",
+  "nativeName": "latine",
+  "keyboard": [
+    [
+      "a",
+      "b",
+      "c",
+      "d",
+      "e",
+      "f",
+      "g",
+      "h",
+      "i"
+    ],
+    [
+      "k",
+      "l",
+      "m",
+      "n",
+      "o",
+      "p",
+      "q",
+      "r",
+      "s"
+    ],
+    [
+      "ENTER",
+      "t",
+      "u",
+      "v",
+      "x",
+      "y",
+      "z",
+      "⌫"
+    ]
+  ],
+  "rtl": false,
+  "availableLengths": [
+    5
+  ],
+  "totalWords": 2000
+}

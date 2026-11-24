@@ -1,0 +1,53 @@
+{
+  "code": "qya",
+  "name": "Quenya",
+  "nativeName": "Quenya",
+  "keyboard": [
+    [
+      "a",
+      "b",
+      "c",
+      "d",
+      "e",
+      "f",
+      "g",
+      "h",
+      "i",
+      "k",
+      "l",
+      "m"
+    ],
+    [
+      "n",
+      "o",
+      "p",
+      "q",
+      "r",
+      "s",
+      "t",
+      "u",
+      "v",
+      "w",
+      "x"
+    ],
+    [
+      "ENTER",
+      "y",
+      "z",
+      "á",
+      "é",
+      "í",
+      "ï",
+      "ñ",
+      "ó",
+      "ú",
+      "þ",
+      "⌫"
+    ]
+  ],
+  "rtl": false,
+  "availableLengths": [
+    5
+  ],
+  "totalWords": 1319
+}

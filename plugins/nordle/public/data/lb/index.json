@@ -1,0 +1,49 @@
+{
+  "code": "lb",
+  "name": "Luxembourgish",
+  "nativeName": "Lëtzebuergesch",
+  "keyboard": [
+    [
+      "a",
+      "ä",
+      "b",
+      "c",
+      "d",
+      "e",
+      "é",
+      "ë",
+      "f",
+      "g",
+      "h"
+    ],
+    [
+      "i",
+      "j",
+      "k",
+      "l",
+      "m",
+      "n",
+      "o",
+      "p",
+      "q",
+      "r"
+    ],
+    [
+      "ENTER",
+      "s",
+      "t",
+      "u",
+      "v",
+      "w",
+      "x",
+      "y",
+      "z",
+      "⌫"
+    ]
+  ],
+  "rtl": false,
+  "availableLengths": [
+    5
+  ],
+  "totalWords": 1751
+}

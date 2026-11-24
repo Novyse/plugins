@@ -1,0 +1,42 @@
+{
+  "code": "tlh",
+  "name": "Klingon",
+  "nativeName": "tlhIngan",
+  "keyboard": [
+    [
+      "a",
+      "b",
+      "c",
+      "d",
+      "e",
+      "g",
+      "h",
+      "i",
+      "j"
+    ],
+    [
+      "l",
+      "m",
+      "n",
+      "o",
+      "p",
+      "q",
+      "r",
+      "s"
+    ],
+    [
+      "ENTER",
+      "t",
+      "u",
+      "v",
+      "w",
+      "y",
+      "⌫"
+    ]
+  ],
+  "rtl": false,
+  "availableLengths": [
+    5
+  ],
+  "totalWords": 219
+}

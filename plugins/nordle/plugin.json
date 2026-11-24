@@ -1,0 +1,23 @@
+{
+  "id": "nordle",
+  "name": "Nordle",
+  "description": "Word guessing game",
+  "version": "0.1.0",
+  "author": {
+    "name": "Novyse",
+    "url": "https://github.com/Novyse"
+  },
+  "capabilities": [
+    "fullscreen"
+  ],
+  "locales": [
+    "en",
+    "it"
+  ],
+  "permissions": {
+    "channels": [
+      "state",
+      "action"
+    ]
+  }
+}

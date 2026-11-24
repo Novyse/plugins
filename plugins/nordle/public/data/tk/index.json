@@ -1,0 +1,50 @@
+{
+  "code": "tk",
+  "name": "Turkmen",
+  "nativeName": "Türkmençe",
+  "keyboard": [
+    [
+      "a",
+      "b",
+      "ç",
+      "d",
+      "e",
+      "ä",
+      "f",
+      "g",
+      "h",
+      "i",
+      "j"
+    ],
+    [
+      "ž",
+      "k",
+      "l",
+      "m",
+      "n",
+      "ň",
+      "o",
+      "ö",
+      "p",
+      "r",
+      "s"
+    ],
+    [
+      "ENTER",
+      "ş",
+      "t",
+      "u",
+      "ü",
+      "w",
+      "y",
+      "ý",
+      "z",
+      "⌫"
+    ]
+  ],
+  "rtl": false,
+  "availableLengths": [
+    5
+  ],
+  "totalWords": 2000
+}

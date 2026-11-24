@@ -1,0 +1,38 @@
+{
+  "code": "mi",
+  "name": "Maori",
+  "nativeName": "Māori",
+  "keyboard": [
+    [
+      "a",
+      "ā",
+      "e",
+      "ē",
+      "h",
+      "i",
+      "ī",
+      "k"
+    ],
+    [
+      "m",
+      "n",
+      "o",
+      "ō",
+      "p",
+      "r",
+      "t",
+      "u"
+    ],
+    [
+      "ENTER",
+      "ū",
+      "w",
+      "⌫"
+    ]
+  ],
+  "rtl": false,
+  "availableLengths": [
+    5
+  ],
+  "totalWords": 1177
+}

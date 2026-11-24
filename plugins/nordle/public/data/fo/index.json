@@ -1,0 +1,49 @@
+{
+  "code": "fo",
+  "name": "Faroese",
+  "nativeName": "føroyskt",
+  "keyboard": [
+    [
+      "a",
+      "á",
+      "b",
+      "d",
+      "ð",
+      "e",
+      "f",
+      "g",
+      "h",
+      "i",
+      "í"
+    ],
+    [
+      "j",
+      "k",
+      "l",
+      "m",
+      "n",
+      "o",
+      "ó",
+      "p",
+      "r",
+      "s"
+    ],
+    [
+      "ENTER",
+      "t",
+      "u",
+      "ú",
+      "v",
+      "y",
+      "ý",
+      "æ",
+      "ø",
+      "⌫"
+    ]
+  ],
+  "rtl": false,
+  "availableLengths": [
+    5
+  ],
+  "totalWords": 2000
+}

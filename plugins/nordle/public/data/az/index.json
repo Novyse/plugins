@@ -1,0 +1,52 @@
+{
+  "code": "az",
+  "name": "Azerbaijan",
+  "nativeName": "Azərbaycan",
+  "keyboard": [
+    [
+      "a",
+      "b",
+      "c",
+      "ç",
+      "d",
+      "e",
+      "ə",
+      "f",
+      "g",
+      "ğ",
+      "h",
+      "x"
+    ],
+    [
+      "ı",
+      "i",
+      "j",
+      "k",
+      "q",
+      "l",
+      "m",
+      "n",
+      "o",
+      "ö",
+      "p"
+    ],
+    [
+      "ENTER",
+      "r",
+      "s",
+      "ş",
+      "t",
+      "u",
+      "ü",
+      "v",
+      "y",
+      "z",
+      "⌫"
+    ]
+  ],
+  "rtl": false,
+  "availableLengths": [
+    5
+  ],
+  "totalWords": 1468
+}

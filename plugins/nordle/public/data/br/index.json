@@ -1,0 +1,48 @@
+{
+  "code": "br",
+  "name": "Breton",
+  "nativeName": "brezhoneg",
+  "keyboard": [
+    [
+      "a",
+      "b",
+      "c",
+      "d",
+      "e",
+      "ê",
+      "f",
+      "g",
+      "h",
+      "i",
+      "j"
+    ],
+    [
+      "k",
+      "l",
+      "m",
+      "n",
+      "ñ",
+      "o",
+      "p",
+      "r",
+      "s",
+      "t"
+    ],
+    [
+      "ENTER",
+      "u",
+      "ù",
+      "v",
+      "w",
+      "x",
+      "y",
+      "z",
+      "⌫"
+    ]
+  ],
+  "rtl": false,
+  "availableLengths": [
+    5
+  ],
+  "totalWords": 2000
+}

@@ -1,0 +1,37 @@
+{
+  "code": "pau",
+  "name": "Palauan",
+  "nativeName": "Tekoi er a Belau",
+  "keyboard": [
+    [
+      "a",
+      "b",
+      "c",
+      "d",
+      "e",
+      "g",
+      "h",
+      "i"
+    ],
+    [
+      "k",
+      "l",
+      "m",
+      "n",
+      "o",
+      "r",
+      "s",
+      "t"
+    ],
+    [
+      "ENTER",
+      "u",
+      "⌫"
+    ]
+  ],
+  "rtl": false,
+  "availableLengths": [
+    5
+  ],
+  "totalWords": 1715
+}

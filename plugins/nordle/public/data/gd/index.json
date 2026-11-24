@@ -1,0 +1,43 @@
+{
+  "code": "gd",
+  "name": "Gaelic",
+  "nativeName": "Gàidhlig",
+  "keyboard": [
+    [
+      "a",
+      "à",
+      "b",
+      "c",
+      "d",
+      "e",
+      "è",
+      "f",
+      "g"
+    ],
+    [
+      "h",
+      "i",
+      "ì",
+      "l",
+      "m",
+      "n",
+      "o",
+      "ò"
+    ],
+    [
+      "ENTER",
+      "p",
+      "r",
+      "s",
+      "t",
+      "u",
+      "ù",
+      "⌫"
+    ]
+  ],
+  "rtl": false,
+  "availableLengths": [
+    5
+  ],
+  "totalWords": 2000
+}

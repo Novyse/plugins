@@ -1,0 +1,53 @@
+{
+  "code": "ie",
+  "name": "Interlingue",
+  "nativeName": "Occidental",
+  "keyboard": [
+    [
+      "a",
+      "b",
+      "c",
+      "d",
+      "e",
+      "f",
+      "g",
+      "h",
+      "i",
+      "j",
+      "k",
+      "l"
+    ],
+    [
+      "m",
+      "n",
+      "o",
+      "p",
+      "q",
+      "r",
+      "s",
+      "t",
+      "u",
+      "v",
+      "w"
+    ],
+    [
+      "ENTER",
+      "x",
+      "y",
+      "z",
+      "á",
+      "è",
+      "é",
+      "í",
+      "ó",
+      "ö",
+      "ú",
+      "⌫"
+    ]
+  ],
+  "rtl": false,
+  "availableLengths": [
+    5
+  ],
+  "totalWords": 2000
+}

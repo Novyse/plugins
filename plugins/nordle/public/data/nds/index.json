@@ -1,0 +1,50 @@
+{
+  "code": "nds",
+  "name": "Low German",
+  "nativeName": "Plattdüütsch",
+  "keyboard": [
+    [
+      "a",
+      "å",
+      "ä",
+      "b",
+      "c",
+      "d",
+      "e",
+      "f",
+      "g",
+      "h",
+      "i"
+    ],
+    [
+      "j",
+      "k",
+      "l",
+      "m",
+      "n",
+      "o",
+      "ö",
+      "p",
+      "q",
+      "r",
+      "s"
+    ],
+    [
+      "ENTER",
+      "t",
+      "u",
+      "ü",
+      "v",
+      "w",
+      "x",
+      "y",
+      "z",
+      "⌫"
+    ]
+  ],
+  "rtl": false,
+  "availableLengths": [
+    5
+  ],
+  "totalWords": 1000
+}

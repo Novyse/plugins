@@ -1,0 +1,1059 @@
+[
+  {
+    "code": "ar",
+    "name": "Arabic",
+    "nativeName": "العربية",
+    "availableLengths": [
+      2,
+      3,
+      4,
+      5,
+      6,
+      7,
+      8,
+      9,
+      10,
+      11,
+      12,
+      14,
+      15
+    ],
+    "totalWords": 12092
+  },
+  {
+    "code": "az",
+    "name": "Azerbaijan",
+    "nativeName": "Azərbaycan",
+    "availableLengths": [
+      5
+    ],
+    "totalWords": 1468
+  },
+  {
+    "code": "bg",
+    "name": "Bulgarian",
+    "nativeName": "български език",
+    "availableLengths": [
+      2,
+      3,
+      4,
+      5,
+      6,
+      7,
+      8,
+      9,
+      10,
+      11,
+      12,
+      13,
+      14,
+      15
+    ],
+    "totalWords": 19563
+  },
+  {
+    "code": "br",
+    "name": "Breton",
+    "nativeName": "brezhoneg",
+    "availableLengths": [
+      5
+    ],
+    "totalWords": 2000
+  },
+  {
+    "code": "ca",
+    "name": "Catalan",
+    "nativeName": "català",
+    "availableLengths": [
+      2,
+      3,
+      4,
+      5,
+      6,
+      7,
+      8,
+      9,
+      10,
+      11,
+      12,
+      13,
+      14,
+      15
+    ],
+    "totalWords": 19934
+  },
+  {
+    "code": "ckb",
+    "name": "Central Kurdish",
+    "nativeName": "کوردی",
+    "availableLengths": [
+      5
+    ],
+    "totalWords": 1454
+  },
+  {
+    "code": "cs",
+    "name": "Czech",
+    "nativeName": "čeština",
+    "availableLengths": [
+      2,
+      3,
+      4,
+      5,
+      6,
+      7,
+      8,
+      9,
+      10,
+      11,
+      12,
+      13,
+      14,
+      15
+    ],
+    "totalWords": 17265
+  },
+  {
+    "code": "da",
+    "name": "Danish",
+    "nativeName": "dansk",
+    "availableLengths": [
+      2,
+      3,
+      4,
+      5,
+      6,
+      7,
+      8,
+      9,
+      10,
+      11,
+      12,
+      13,
+      14,
+      15
+    ],
+    "totalWords": 21141
+  },
+  {
+    "code": "de",
+    "name": "German",
+    "nativeName": "Deutsch",
+    "availableLengths": [
+      2,
+      3,
+      4,
+      5,
+      6,
+      7,
+      8,
+      9,
+      10,
+      11,
+      12,
+      13,
+      14,
+      15
+    ],
+    "totalWords": 22398
+  },
+  {
+    "code": "el",
+    "name": "Greek",
+    "nativeName": "Ελληνικά",
+    "availableLengths": [
+      2,
+      3,
+      4,
+      5,
+      6,
+      7,
+      8,
+      9,
+      10,
+      11,
+      12,
+      13,
+      14,
+      15
+    ],
+    "totalWords": 20897
+  },
+  {
+    "code": "en",
+    "name": "English",
+    "nativeName": "English",
+    "availableLengths": [
+      2,
+      3,
+      4,
+      5,
+      6,
+      7,
+      8,
+      9,
+      10,
+      11,
+      12,
+      13,
+      14,
+      15
+    ],
+    "totalWords": 43604
+  },
+  {
+    "code": "eo",
+    "name": "Esperanto",
+    "nativeName": "Esperanto",
+    "availableLengths": [
+      5
+    ],
+    "totalWords": 2000
+  },
+  {
+    "code": "es",
+    "name": "Spanish",
+    "nativeName": "Español",
+    "availableLengths": [
+      2,
+      3,
+      4,
+      5,
+      6,
+      7,
+      8,
+      9,
+      10,
+      11,
+      12,
+      13,
+      14,
+      15
+    ],
+    "totalWords": 19778
+  },
+  {
+    "code": "et",
+    "name": "Estonian",
+    "nativeName": "eesti",
+    "availableLengths": [
+      2,
+      3,
+      4,
+      5,
+      6,
+      7,
+      8,
+      9,
+      10,
+      11,
+      12,
+      13,
+      14,
+      15
+    ],
+    "totalWords": 19642
+  },
+  {
+    "code": "eu",
+    "name": "Basque",
+    "nativeName": "euskara",
+    "availableLengths": [
+      2,
+      3,
+      4,
+      5,
+      6,
+      7,
+      8,
+      9,
+      10,
+      11,
+      12,
+      13,
+      14,
+      15
+    ],
+    "totalWords": 21217
+  },
+  {
+    "code": "fa",
+    "name": "Persian",
+    "nativeName": "فارسی",
+    "availableLengths": [
+      2,
+      3,
+      4,
+      5,
+      6,
+      7,
+      8,
+      9,
+      10,
+      11,
+      12,
+      13,
+      14
+    ],
+    "totalWords": 12844
+  },
+  {
+    "code": "fi",
+    "name": "Finnish",
+    "nativeName": "Suomi",
+    "availableLengths": [
+      2,
+      3,
+      4,
+      5,
+      6,
+      7,
+      8,
+      9,
+      10,
+      11,
+      12,
+      13,
+      14,
+      15
+    ],
+    "totalWords": 21116
+  },
+  {
+    "code": "fo",
+    "name": "Faroese",
+    "nativeName": "føroyskt",
+    "availableLengths": [
+      5
+    ],
+    "totalWords": 2000
+  },
+  {
+    "code": "fr",
+    "name": "French",
+    "nativeName": "français",
+    "availableLengths": [
+      2,
+      3,
+      4,
+      5,
+      6,
+      7,
+      8,
+      9,
+      10,
+      11,
+      12,
+      13,
+      14,
+      15
+    ],
+    "totalWords": 19463
+  },
+  {
+    "code": "fur",
+    "name": "Fur",
+    "nativeName": "bèle fòòr",
+    "availableLengths": [
+      5
+    ],
+    "totalWords": 2000
+  },
+  {
+    "code": "fy",
+    "name": "Western Frisian",
+    "nativeName": "Frysk",
+    "availableLengths": [
+      5
+    ],
+    "totalWords": 2000
+  },
+  {
+    "code": "ga",
+    "name": "Irish",
+    "nativeName": "Gaeilge",
+    "availableLengths": [
+      5
+    ],
+    "totalWords": 2000
+  },
+  {
+    "code": "gd",
+    "name": "Gaelic",
+    "nativeName": "Gàidhlig",
+    "availableLengths": [
+      5
+    ],
+    "totalWords": 2000
+  },
+  {
+    "code": "gl",
+    "name": "Galician",
+    "nativeName": "Galego",
+    "availableLengths": [
+      2,
+      3,
+      4,
+      5,
+      6,
+      7,
+      8,
+      9,
+      10,
+      11,
+      12,
+      13,
+      14,
+      15
+    ],
+    "totalWords": 20421
+  },
+  {
+    "code": "he",
+    "name": "Hebrew",
+    "nativeName": "עברית",
+    "availableLengths": [
+      2,
+      3,
+      4,
+      5,
+      6,
+      7,
+      8,
+      9,
+      10,
+      11,
+      12,
+      13
+    ],
+    "totalWords": 11805
+  },
+  {
+    "code": "hr",
+    "name": "Croatian",
+    "nativeName": "hrvatski jezik",
+    "availableLengths": [
+      2,
+      3,
+      4,
+      5,
+      6,
+      7,
+      8,
+      9,
+      10,
+      11,
+      12,
+      13,
+      14,
+      15
+    ],
+    "totalWords": 18118
+  },
+  {
+    "code": "hu",
+    "name": "Hungarian",
+    "nativeName": "magyar",
+    "availableLengths": [
+      2,
+      3,
+      4,
+      5,
+      6,
+      7,
+      8,
+      9,
+      10,
+      11,
+      12,
+      13,
+      14,
+      15
+    ],
+    "totalWords": 20803
+  },
+  {
+    "code": "hy",
+    "name": "Armenian",
+    "nativeName": "Հայերեն",
+    "availableLengths": [
+      5
+    ],
+    "totalWords": 2000
+  },
+  {
+    "code": "hyw",
+    "name": "Western Armenian",
+    "nativeName": "արեւմտահայերէն",
+    "availableLengths": [
+      5
+    ],
+    "totalWords": 2000
+  },
+  {
+    "code": "ia",
+    "name": "Interlingua",
+    "nativeName": "Interlingua",
+    "availableLengths": [
+      5
+    ],
+    "totalWords": 2000
+  },
+  {
+    "code": "ie",
+    "name": "Interlingue",
+    "nativeName": "Occidental",
+    "availableLengths": [
+      5
+    ],
+    "totalWords": 2000
+  },
+  {
+    "code": "is",
+    "name": "Icelandic",
+    "nativeName": "Íslenska",
+    "availableLengths": [
+      2,
+      3,
+      4,
+      5,
+      6,
+      7,
+      8,
+      9,
+      10,
+      11,
+      12,
+      13,
+      14,
+      15
+    ],
+    "totalWords": 20339
+  },
+  {
+    "code": "it",
+    "name": "Italian",
+    "nativeName": "Italiano",
+    "availableLengths": [
+      2,
+      3,
+      4,
+      5,
+      6,
+      7,
+      8,
+      9,
+      10,
+      11,
+      12,
+      13,
+      14,
+      15
+    ],
+    "totalWords": 43379
+  },
+  {
+    "code": "ka",
+    "name": "Georgian",
+    "nativeName": "ქართული",
+    "availableLengths": [
+      2,
+      3,
+      4,
+      5,
+      6,
+      7,
+      8,
+      9,
+      10,
+      11,
+      12,
+      13,
+      14,
+      15
+    ],
+    "totalWords": 19094
+  },
+  {
+    "code": "ko",
+    "name": "Korean",
+    "nativeName": "한국어",
+    "availableLengths": [
+      2,
+      3,
+      4,
+      5,
+      6,
+      7,
+      8,
+      9,
+      10
+    ],
+    "totalWords": 6307
+  },
+  {
+    "code": "la",
+    "name": "Latin",
+    "nativeName": "latine",
+    "availableLengths": [
+      5
+    ],
+    "totalWords": 2000
+  },
+  {
+    "code": "lb",
+    "name": "Luxembourgish",
+    "nativeName": "Lëtzebuergesch",
+    "availableLengths": [
+      5
+    ],
+    "totalWords": 1751
+  },
+  {
+    "code": "lt",
+    "name": "Lithuanian",
+    "nativeName": "lietuvių kalba",
+    "availableLengths": [
+      2,
+      3,
+      4,
+      5,
+      6,
+      7,
+      8,
+      9,
+      10,
+      11,
+      12,
+      13,
+      14,
+      15
+    ],
+    "totalWords": 19208
+  },
+  {
+    "code": "ltg",
+    "name": "Latgalian",
+    "nativeName": "latgaliski",
+    "availableLengths": [
+      5
+    ],
+    "totalWords": 387
+  },
+  {
+    "code": "lv",
+    "name": "Latvian",
+    "nativeName": "latviešu valoda",
+    "availableLengths": [
+      2,
+      3,
+      4,
+      5,
+      6,
+      7,
+      8,
+      9,
+      10,
+      11,
+      12,
+      13,
+      14,
+      15
+    ],
+    "totalWords": 19227
+  },
+  {
+    "code": "mi",
+    "name": "Maori",
+    "nativeName": "Māori",
+    "availableLengths": [
+      5
+    ],
+    "totalWords": 1177
+  },
+  {
+    "code": "mk",
+    "name": "Macedonian",
+    "nativeName": "македонски јазик",
+    "availableLengths": [
+      2,
+      3,
+      4,
+      5,
+      6,
+      7,
+      8,
+      9,
+      10,
+      11,
+      12,
+      13,
+      14,
+      15
+    ],
+    "totalWords": 19311
+  },
+  {
+    "code": "mn",
+    "name": "Mongolian",
+    "nativeName": "Монгол хэл",
+    "availableLengths": [
+      5
+    ],
+    "totalWords": 2000
+  },
+  {
+    "code": "nb",
+    "name": "Norwegian Bokmål",
+    "nativeName": "Norsk Bokmål",
+    "availableLengths": [
+      5
+    ],
+    "totalWords": 2000
+  },
+  {
+    "code": "nds",
+    "name": "Low German",
+    "nativeName": "Plattdüütsch",
+    "availableLengths": [
+      5
+    ],
+    "totalWords": 1000
+  },
+  {
+    "code": "ne",
+    "name": "Nepali",
+    "nativeName": "नेपाली",
+    "availableLengths": [
+      5
+    ],
+    "totalWords": 2000
+  },
+  {
+    "code": "nl",
+    "name": "Dutch",
+    "nativeName": "Nederlands",
+    "availableLengths": [
+      2,
+      3,
+      4,
+      5,
+      6,
+      7,
+      8,
+      9,
+      10,
+      11,
+      12,
+      13,
+      14,
+      15
+    ],
+    "totalWords": 21695
+  },
+  {
+    "code": "nn",
+    "name": "Norwegian Nynorsk",
+    "nativeName": "Norsk Nynorsk",
+    "availableLengths": [
+      5
+    ],
+    "totalWords": 2000
+  },
+  {
+    "code": "oc",
+    "name": "Occitan",
+    "nativeName": "occitan",
+    "availableLengths": [
+      5
+    ],
+    "totalWords": 2000
+  },
+  {
+    "code": "pau",
+    "name": "Palauan",
+    "nativeName": "Tekoi er a Belau",
+    "availableLengths": [
+      5
+    ],
+    "totalWords": 1715
+  },
+  {
+    "code": "pl",
+    "name": "Polish",
+    "nativeName": "język polski",
+    "availableLengths": [
+      2,
+      3,
+      4,
+      5,
+      6,
+      7,
+      8,
+      9,
+      10,
+      11,
+      12,
+      13,
+      14,
+      15
+    ],
+    "totalWords": 20020
+  },
+  {
+    "code": "pt",
+    "name": "Portuguese",
+    "nativeName": "Português",
+    "availableLengths": [
+      2,
+      3,
+      4,
+      5,
+      6,
+      7,
+      8,
+      9,
+      10,
+      11,
+      12,
+      13,
+      14,
+      15
+    ],
+    "totalWords": 19326
+  },
+  {
+    "code": "qya",
+    "name": "Quenya",
+    "nativeName": "Quenya",
+    "availableLengths": [
+      5
+    ],
+    "totalWords": 1319
+  },
+  {
+    "code": "ro",
+    "name": "Romanian",
+    "nativeName": "Română",
+    "availableLengths": [
+      2,
+      3,
+      4,
+      5,
+      6,
+      7,
+      8,
+      9,
+      10,
+      11,
+      12,
+      13,
+      14,
+      15
+    ],
+    "totalWords": 18955
+  },
+  {
+    "code": "ru",
+    "name": "Russian",
+    "nativeName": "русский",
+    "availableLengths": [
+      2,
+      3,
+      4,
+      5,
+      6,
+      7,
+      8,
+      9,
+      10,
+      11,
+      12,
+      13,
+      14,
+      15
+    ],
+    "totalWords": 20079
+  },
+  {
+    "code": "rw",
+    "name": "Kinyarwanda",
+    "nativeName": "Ikinyarwanda",
+    "availableLengths": [
+      5
+    ],
+    "totalWords": 20
+  },
+  {
+    "code": "sk",
+    "name": "Slovak",
+    "nativeName": "slovenčina",
+    "availableLengths": [
+      2,
+      3,
+      4,
+      5,
+      6,
+      7,
+      8,
+      9,
+      10,
+      11,
+      12,
+      13,
+      14,
+      15
+    ],
+    "totalWords": 17904
+  },
+  {
+    "code": "sl",
+    "name": "Slovenian",
+    "nativeName": "Slovenski jezik",
+    "availableLengths": [
+      2,
+      3,
+      4,
+      5,
+      6,
+      7,
+      8,
+      9,
+      10,
+      11,
+      12,
+      13,
+      14,
+      15
+    ],
+    "totalWords": 18151
+  },
+  {
+    "code": "sr",
+    "name": "Serbian",
+    "nativeName": "српски језик",
+    "availableLengths": [
+      2,
+      3,
+      4,
+      5,
+      6,
+      7,
+      8,
+      9,
+      10,
+      11,
+      12,
+      13,
+      14,
+      15
+    ],
+    "totalWords": 17598
+  },
+  {
+    "code": "sv",
+    "name": "Swedish",
+    "nativeName": "Svenska",
+    "availableLengths": [
+      2,
+      3,
+      4,
+      5,
+      6,
+      7,
+      8,
+      9,
+      10,
+      11,
+      12,
+      13,
+      14,
+      15
+    ],
+    "totalWords": 20711
+  },
+  {
+    "code": "tk",
+    "name": "Turkmen",
+    "nativeName": "Türkmençe",
+    "availableLengths": [
+      5
+    ],
+    "totalWords": 2000
+  },
+  {
+    "code": "tlh",
+    "name": "Klingon",
+    "nativeName": "tlhIngan",
+    "availableLengths": [
+      5
+    ],
+    "totalWords": 219
+  },
+  {
+    "code": "tr",
+    "name": "Turkish",
+    "nativeName": "Türkçe",
+    "availableLengths": [
+      2,
+      3,
+      4,
+      5,
+      6,
+      7,
+      8,
+      9,
+      10,
+      11,
+      12,
+      13,
+      14,
+      15
+    ],
+    "totalWords": 21078
+  },
+  {
+    "code": "uk",
+    "name": "Ukrainian",
+    "nativeName": "Українська",
+    "availableLengths": [
+      2,
+      3,
+      4,
+      5,
+      6,
+      7,
+      8,
+      9,
+      10,
+      11,
+      12,
+      13,
+      14,
+      15
+    ],
+    "totalWords": 18894
+  },
+  {
+    "code": "vi",
+    "name": "Vietnamese",
+    "nativeName": "Tiếng Việt",
+    "availableLengths": [
+      2,
+      3,
+      4,
+      5,
+      6,
+      7,
+      8,
+      9,
+      10,
+      11,
+      12,
+      13,
+      14,
+      15
+    ],
+    "totalWords": 15944
+  }
+]

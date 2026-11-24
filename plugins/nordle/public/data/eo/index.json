@@ -1,0 +1,48 @@
+{
+  "code": "eo",
+  "name": "Esperanto",
+  "nativeName": "Esperanto",
+  "keyboard": [
+    [
+      "ŝ",
+      "ĝ",
+      "e",
+      "r",
+      "t",
+      "ŭ",
+      "u",
+      "i",
+      "o",
+      "p"
+    ],
+    [
+      "a",
+      "s",
+      "d",
+      "f",
+      "g",
+      "h",
+      "j",
+      "k",
+      "l",
+      "ĵ"
+    ],
+    [
+      "ENTER",
+      "z",
+      "ĉ",
+      "c",
+      "v",
+      "b",
+      "n",
+      "m",
+      "ĥ",
+      "⌫"
+    ]
+  ],
+  "rtl": false,
+  "availableLengths": [
+    5
+  ],
+  "totalWords": 2000
+}
