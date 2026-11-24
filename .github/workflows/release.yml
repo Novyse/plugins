@@ -104,20 +104,14 @@ jobs:
             --notes "Source: https://github.com/${GITHUB_REPOSITORY}/tree/${tag}" || \
           gh release upload "${tag}" "${archive}" --clobber
 
-  deploy-pages:
-    name: deploy pages
+  build-pages:
+    name: build pages
     needs: publish
     runs-on: ubuntu-latest
     permissions:
       contents: read
       pages: write
       id-token: write
-    concurrency:
-      group: pages
-      cancel-in-progress: false
-    environment:
-      name: github-pages
-      url: ${{ steps.deployment.outputs.page_url }}
     steps:
       - uses: actions/checkout@v4
         with:
@@ -138,6 +132,20 @@ jobs:
         with:
           path: _site
 
+  deploy-pages:
+    name: deploy pages
+    needs: build-pages
+    runs-on: ubuntu-latest
+    permissions:
+      pages: write
+      id-token: write
+    concurrency:
+      group: pages
+      cancel-in-progress: false
+    environment:
+      name: ${{ 'github-pages' }}
+      url: ${{ steps.deployment.outputs.page_url }}
+    steps:
       - name: Deploy to GitHub Pages
         id: deployment
         uses: actions/deploy-pages@v4
