@@ -96,8 +96,6 @@ for (const [index, plugin] of plugins.entries()) {
 
   if (plugin.entry !== `plugins/${plugin.slug}/dist/index.html`) {
     fail(`${at}.entry must be plugins/${plugin.slug}/dist/index.html`);
-  } else if (!existsSync(join(root, plugin.entry))) {
-    fail(`${at}.entry does not exist: ${plugin.entry}`);
   }
 
   if (plugin.icon !== undefined && !existsSync(join(root, plugin.icon))) {

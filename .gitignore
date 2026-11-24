@@ -148,6 +148,9 @@ vite.config.ts.timestamp-*
 # Turbo Repo
 .turbo
 
+# Plugin build artifacts
+plugins/*/dist/
+
 # Release assets: uploaded to GitHub Releases, never committed
 *.zip
 

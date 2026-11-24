@@ -15,16 +15,15 @@ jobs:
 
     steps:
       - uses: actions/checkout@v4
+        with:
+          fetch-depth: 0
 
       - uses: actions/setup-node@v4
         with:
           node-version: 22
 
-      - name: Validate the registry
-        run: node scripts/validate-registry.mjs
-
-      - name: Package the bundle
-        id: bundle
+      - name: Resolve target plugin and version
+        id: meta
         run: |
           set -euo pipefail
 
@@ -32,8 +31,8 @@ jobs:
           slug="${tag%@*}"
           version="${tag#*@}"
 
-          if [ ! -f "plugins/${slug}/dist/index.html" ]; then
-            echo "missing plugins/${slug}/dist/index.html: build the plugin and commit dist/ before tagging" >&2
+          if [ ! -f "plugins/${slug}/plugin.json" ]; then
+            echo "missing plugins/${slug}/plugin.json" >&2
             exit 1
           fi
 
@@ -43,9 +42,51 @@ jobs:
             exit 1
           fi
 
-          node scripts/bundle.mjs "${slug}" --check-registry
+          echo "slug=${slug}" >> "$GITHUB_OUTPUT"
+          echo "version=${version}" >> "$GITHUB_OUTPUT"
+          echo "tag=${tag}" >> "$GITHUB_OUTPUT"
+
+      - name: Build plugin
+        run: |
+          set -euo pipefail
+          slug="${{ steps.meta.outputs.slug }}"
+
+          echo "Building plugin ${slug}..."
+          cd "plugins/${slug}"
+          npm ci || npm install
+          npm run build
+          cd ../..
+
+      - name: Package bundle and update registry
+        id: bundle
+        run: |
+          set -euo pipefail
+          slug="${{ steps.meta.outputs.slug }}"
+
+          node scripts/bundle.mjs "${slug}" --update-registry
+          node scripts/validate-registry.mjs
 
           echo "archive=${slug}-bundle.zip" >> "$GITHUB_OUTPUT"
+
+      - name: Commit and push updated registry.json
+        run: |
+          set -euo pipefail
+          slug="${{ steps.meta.outputs.slug }}"
+          version="${{ steps.meta.outputs.version }}"
+
+          git config user.name "github-actions[bot]"
+          git config user.email "github-actions[bot]@users.noreply.github.com"
+
+          git checkout main
+          git pull --rebase origin main
+
+          git add registry.json
+          if ! git diff-index --quiet HEAD --; then
+            git commit -m "chore(registry): update ${slug} to ${version}"
+            git push origin main
+          else
+            echo "registry.json is already up to date"
+          fi
 
       - name: Publish the release
         env:
@@ -53,10 +94,12 @@ jobs:
         run: |
           set -euo pipefail
 
-          tag="${GITHUB_REF_NAME}"  
-          slug="${tag%@*}"
-          version="${tag#*@}"
+          tag="${{ steps.meta.outputs.tag }}"
+          slug="${{ steps.meta.outputs.slug }}"
+          version="${{ steps.meta.outputs.version }}"
+          archive="${{ steps.bundle.outputs.archive }}"
 
-          gh release create "${tag}" "${{ steps.bundle.outputs.archive }}" \
+          gh release create "${tag}" "${archive}" \
             --title "${slug} ${version}" \
-            --notes "Source: https://github.com/${GITHUB_REPOSITORY}/tree/${tag}"
+            --notes "Source: https://github.com/${GITHUB_REPOSITORY}/tree/${tag}" || \
+          gh release upload "${tag}" "${archive}" --clobber

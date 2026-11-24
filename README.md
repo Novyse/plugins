@@ -7,11 +7,8 @@ Static, self-contained builds distributed via GitHub Releases.
 
 - `registry.json` is the **only source of truth** for the plugin library. The API gateway
   reads it from `raw.githubusercontent.com` and never calls the GitHub API.
-- `plugins/<slug>/dist/` is **committed**. The web client fetches
-  `dist/index.html` from the raw URL at the release tag, so an uncommitted build would
-  not be servable. Native clients download the zip attached to the release.
-- The zip is never committed: it is built by CI from the committed `dist/` and attached
-  to the GitHub Release.
+- All Novyse clients download the plugin bundle directly from the `.zip` archive attached to the GitHub Release.
+- Neither `dist/` nor the release zip are committed to Git: CI builds the plugin from source, generates the deterministic bundle, updates `registry.json`, and publishes the GitHub Release.
 
 ## Layout
 
@@ -30,7 +27,7 @@ plugins/
   <slug>/
     plugin.json               source metadata (id, version, locales, capabilities, permissions)
     src/                      sources (React/Preact/TS/...)
-    dist/                     built bundle: index.html, manifest.json
+    dist/                     built bundle (generated at build time, ignored in Git)
     store/                    store art: icon.png, banner.png, screenshots
 .github/workflows/
   validate.yml                checks on every push and pull request
@@ -308,8 +305,8 @@ grep -o 'https://[a-z0-9.-]*' plugins/<slug>/dist/index.html | sort -u
 ```
 
 should list only namespaces, documentation links and origins that are never
-opened at runtime. Watch the size too: the file is committed, zipped without
-compression and downloaded on every install, so a few megabytes is the ceiling.
+opened at runtime. Watch the size too: the bundle is downloaded on every install,
+so keeping it lean ensures fast loading.
 
 ## Store assets
 
@@ -369,19 +366,9 @@ for an example.
 
 ## Publishing a plugin
 
-1. Build the plugin so that `plugins/<slug>/dist/index.html` is a single self-contained
-   document (all CSS and JS inlined, no relative assets).
-2. Run the bundler, which zips `dist/` deterministically and writes `sha256`,
-   `sizeBytes`, `tag` and the paths into `registry.json`:
-
-   ```sh
-   node scripts/bundle.mjs watch-together --update-registry
-   ```
-
-   The zip is store-only with fixed timestamps, so the digest is reproducible: the value
-   committed on `main` is the digest of the asset CI publishes, and the native clients
-   verify the download against it.
-3. Commit `src/`, `dist/`, `plugin.json`, `registry.json` and the tag of the release.
+1. Develop and test your plugin sources in `plugins/<slug>/src/`.
+2. Update the version in `plugins/<slug>/plugin.json`.
+3. Commit your changes and push to `main`.
 4. Push the tag `<slug>@<version>`:
 
    ```sh
@@ -389,10 +376,13 @@ for an example.
    git push origin main --tags
    ```
 
-5. CI validates the registry, checks that the tag matches `plugin.json`, zips `dist/` into
-   `<slug>-bundle.zip` and creates the release.
-6. The API gateway picks the new `registry.json` within 30 seconds; the client downloads
-   the new version on its next launch.
+5. CI automatically:
+   - Installs dependencies and builds the plugin (`npm ci && npm run build`).
+   - Packages `<slug>-bundle.zip` and calculates the deterministic `sha256` and `sizeBytes`.
+   - Updates `registry.json` and commits it back to `main`.
+   - Publishes the GitHub Release attaching `<slug>-bundle.zip`.
+6. The API gateway picks the new `registry.json` within 30 seconds; clients download
+   the new version on their next launch.
 
 Tags are immutable, a version is never reused, and an already published bundle never
 changes. A rollback is a new patch version pointing at the previous build.
