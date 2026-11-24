@@ -76,12 +76,21 @@ jobs:
 
           git config user.name "github-actions[bot]"
           git config user.email "github-actions[bot]@users.noreply.github.com"
+          stashed=0
+          if ! git diff --quiet -- registry.json; then
+            git stash push --message "registry ${slug}@${version}" -- registry.json
+            stashed=1
+          fi
 
           git checkout main
           git pull --rebase origin main
 
+          if [ "${stashed}" -eq 1 ]; then
+            git stash pop
+          fi
+
           git add registry.json
-          if ! git diff-index --quiet HEAD --; then
+          if ! git diff-index --quiet HEAD -- registry.json; then
             git commit -m "chore(registry): update ${slug} to ${version}"
             git push origin main
           else
