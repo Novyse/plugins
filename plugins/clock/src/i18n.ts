@@ -18,16 +18,27 @@ export function normalizeLocale(tag: string | null | undefined): Locale {
 export interface Messages {
   title: string;
   tagline: string;
+  toolTimer: string;
+  toolStopwatch: string;
+  toolAlarm: string;
   phaseFocus: string;
   phaseShort: string;
   start: string;
   pause: string;
   restart: string;
   reset: string;
+  arm: string;
+  disarm: string;
+  dismiss: string;
   running: string;
   paused: string;
   done: string;
+  armed: string;
+  ringing: string;
+  idle: string;
   duration: string;
+  alarmTime: string;
+  ringsAt: (time: string) => string;
   hours: string;
   minutes: string;
   seconds: string;
@@ -44,18 +55,29 @@ export interface Messages {
 }
 
 const EN: Messages = {
-  title: 'Timer',
-  tagline: 'One timer for the whole room',
+  title: 'Clock',
+  tagline: 'Timer, stopwatch and alarm for the room',
+  toolTimer: 'Timer',
+  toolStopwatch: 'Stopwatch',
+  toolAlarm: 'Alarm',
   phaseFocus: 'Focus',
   phaseShort: 'Short break',
   start: 'Start',
   pause: 'Pause',
   restart: 'Restart',
   reset: 'Reset',
+  arm: 'Arm',
+  disarm: 'Disarm',
+  dismiss: 'Dismiss',
   running: 'running',
   paused: 'paused',
   done: 'time is up',
+  armed: 'armed',
+  ringing: 'ringing',
+  idle: 'idle',
   duration: 'Duration',
+  alarmTime: 'Alarm time',
+  ringsAt: (time) => `Rings at ${time}`,
   hours: 'h',
   minutes: 'm',
   seconds: 's',
@@ -65,25 +87,36 @@ const EN: Messages = {
   increase: (unit) => `Increase ${unit}`,
   decrease: (unit) => `Decrease ${unit}`,
   fullscreen: 'Full screen',
-  readOnly: 'Read only: you can follow the timer, not change it.',
-  ended: (reason) => `Timer ended (${reason}).`,
+  readOnly: 'Read only: you can follow the clock, not change it.',
+  ended: (reason) => `Clock ended (${reason}).`,
   error: 'Error',
   loading: 'Loading…',
 };
 
 const IT: Messages = {
-  title: 'Timer',
-  tagline: 'Un timer per tutta la stanza',
+  title: 'Clock',
+  tagline: 'Timer, cronometro e sveglia per la stanza',
+  toolTimer: 'Timer',
+  toolStopwatch: 'Cronometro',
+  toolAlarm: 'Sveglia',
   phaseFocus: 'Focus',
   phaseShort: 'Pausa breve',
   start: 'Avvia',
   pause: 'Pausa',
   restart: 'Ricomincia',
   reset: 'Azzera',
+  arm: 'Attiva',
+  disarm: 'Disattiva',
+  dismiss: 'Chiudi',
   running: 'in corso',
   paused: 'in pausa',
   done: 'tempo scaduto',
+  armed: 'attiva',
+  ringing: 'sta suonando',
+  idle: 'inattiva',
   duration: 'Durata',
+  alarmTime: 'Ora della sveglia',
+  ringsAt: (time) => `Suona alle ${time}`,
   hours: 'h',
   minutes: 'm',
   seconds: 's',
@@ -93,8 +126,8 @@ const IT: Messages = {
   increase: (unit) => `Aumenta ${unit}`,
   decrease: (unit) => `Diminuisci ${unit}`,
   fullscreen: 'Schermo intero',
-  readOnly: 'Sola lettura: puoi seguire il timer, non modificarlo.',
-  ended: (reason) => `Timer terminato (${reason}).`,
+  readOnly: 'Sola lettura: puoi seguire l\'orologio, non modificarlo.',
+  ended: (reason) => `Clock terminato (${reason}).`,
   error: 'Errore',
   loading: 'Caricamento…',
 };

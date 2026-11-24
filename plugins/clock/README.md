@@ -1,0 +1,36 @@
+# Clock
+
+A shared clock for the voice room: **timer**, **stopwatch** and **alarm**, with everyone on the same timebase.
+
+![Clock, the shared time tools of a voice room](https://raw.githubusercontent.com/Novyse/plugins/main/plugins/clock/store/screen-1.png)
+
+## How to use it
+
+Pick a tool at the top: **Timer**, **Stopwatch** or **Alarm**. Switching tools does not wipe the others; a running timer keeps counting while you look at the stopwatch.
+
+### Timer
+
+- Pick **Focus** or **Short break**.
+- Anyone in the room can start, pause or reset the timer.
+- While the timer is **paused**, the centre of the dial shows the time that is left, in the same picker used to set it: hours (up to 99), minutes and seconds, each with arrows above and below, and the numbers can be typed. Editing while paused moves the moment **play** resumes from. Changes apply automatically after a moment, there is no Apply button.
+- Each mode remembers its last duration on your device. Switching mode uses that value.
+- When the countdown reaches zero every client rings a bell.
+
+### Stopwatch
+
+- Start, pause and reset are shared with the room.
+- The dial shows elapsed time with a tenth of a second; the ring tracks the current minute.
+
+### Alarm
+
+- Set a wall-clock time (hours, minutes, seconds) and **Arm** it. The room stores an absolute fire time, so everyone rings together.
+- While armed, the dial counts down to that moment and shows when it will ring in your local time.
+- When it fires, every client rings until someone **Dismiss**es it. **Disarm** cancels an armed alarm before it rings.
+
+The first tap on the clock unlocks audio: browsers keep sound blocked until a gesture.
+
+Close, **Pin** and **Full screen** are the buttons in the top-right corner, with the context menu beside them; the arrow in that corner folds them into a single dot when you want the whole surface back. The tile is the whole activity, with no bar of the app around it.
+
+Running tools follow the server clock, so a late joiner lands on the same second.
+
+Limits: one instance per room, and up to three activities can run at once.

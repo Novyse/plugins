@@ -64,7 +64,7 @@ function scheduleBell(audio: AudioContext, start: number): void {
 }
 
 /**
- * Rings the bell a few times, so a timer that ends while the tab is in the
+ * Rings the bell a few times, so a clock that ends while the tab is in the
  * background is still noticed. If the context is suspended, `resume` is
  * awaited first: a gesture that happened earlier makes this work.
  */

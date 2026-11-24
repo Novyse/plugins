@@ -1,8 +1,8 @@
 {
-  "id": "timer",
-  "name": "Timer",
-  "description": "A shared timer for the room: focus or short break, with a duration up to 99 hours.",
-  "version": "0.1.3",
+  "id": "clock",
+  "name": "Clock",
+  "description": "A shared clock for the room: timer, stopwatch and alarm.",
+  "version": "0.2.0",
   "author": {
     "name": "Novyse",
     "url": "https://github.com/Novyse"

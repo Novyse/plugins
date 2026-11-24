@@ -26,7 +26,7 @@ body {
   user-select: none;
 }
 
-.timer {
+.clock {
   /* `themeColors` (the default): the host writes these to the root element.
      The fallback is the plugin's own palette, used before `init()` answers. */
   --bg: var(--nv-background, #071427);
@@ -48,9 +48,12 @@ body {
   --radius-lg: var(--nv-radius-lg, 24px);
 
   box-sizing: border-box;
+  width: 100%;
+  max-width: 600px;
   height: 100%;
+  margin-inline: auto;
   display: grid;
-  grid-template-rows: auto auto minmax(0, 1fr) auto;
+  grid-template-rows: auto auto auto minmax(0, 1fr) auto;
   gap: clamp(8px, 2.2vmin, 14px);
   padding: clamp(10px, 3vmin, 22px);
   overflow-y: auto;
@@ -60,10 +63,14 @@ body {
   transition: background-color 0.3s ease;
 }
 
+.clock:not([data-tool='timer']) {
+  grid-template-rows: auto auto minmax(0, 1fr) auto;
+}
+
 /* Theme-type mode: a plugin that does not use `themeColors` can stop here and
    let this block paint the light mode. With `themeColors` the host variables
    above win, because every token reads `var(--nv-…, fallback)`. */
-.timer--light {
+.clock--light {
   --bg: var(--nv-background, #f5f9ff);
   --surface: var(--nv-surface, #f1f6ff);
   --surface-hover: var(--nv-surface-hover, #ecf3ff);
@@ -81,15 +88,30 @@ body {
   color-scheme: light;
 }
 
-/* The mode only colors the ring and the active tab: buttons stay on the
+/* Tool / phase only color the ring and the active tab: buttons stay on the
    primary accent of the app, so every screen has the same call to action. */
-.timer[data-phase="short"] {
+.clock[data-tool='timer'][data-phase='short'] {
   --accent: var(--nv-success, #1dbf73);
   --accent-soft: rgba(29, 191, 115, 0.16);
   --accent-soft: color-mix(in srgb, var(--nv-success, #1dbf73) 16%, transparent);
 }
 
-.timer__header {
+.clock[data-tool='stopwatch'] {
+  --accent: #e0a24a;
+  --accent-soft: color-mix(in srgb, #e0a24a 16%, transparent);
+}
+
+.clock[data-tool='alarm'] {
+  --accent: #e45757;
+  --accent-soft: color-mix(in srgb, #e45757 16%, transparent);
+}
+
+.clock[data-ringing='true'] {
+  --accent: var(--nv-danger, #e45757);
+  --accent-soft: color-mix(in srgb, var(--nv-danger, #e45757) 22%, transparent);
+}
+
+.clock__header {
   display: flex;
   align-items: flex-start;
   justify-content: space-between;
@@ -97,18 +119,18 @@ body {
   padding-right: clamp(96px, 34vw, 140px);
 }
 
-.timer__heading {
+.clock__heading {
   min-width: 0;
 }
 
-.timer__title {
+.clock__title {
   margin: 0;
   font-size: clamp(15px, 3.4vmin, 19px);
   font-weight: 650;
   letter-spacing: -0.01em;
 }
 
-.timer__subtitle {
+.clock__subtitle {
   margin: 2px 0 0;
   color: var(--muted);
   font-size: 11px;
@@ -117,10 +139,45 @@ body {
   text-overflow: ellipsis;
 }
 
-.timer__tools {
+.clock__tools {
   display: flex;
-  gap: 6px;
-  flex-shrink: 0;
+  gap: 4px;
+  padding: 3px;
+  border: 1px solid var(--line);
+  border-radius: var(--radius-md);
+  background: var(--surface);
+}
+
+.tool {
+  flex: 1;
+  min-width: 0;
+  padding: 7px 6px;
+  border: 0;
+  border-radius: var(--radius-sm);
+  background: transparent;
+  color: var(--muted);
+  font: inherit;
+  font-size: 11.5px;
+  font-weight: 600;
+  white-space: nowrap;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  cursor: pointer;
+  transition:
+    background-color 0.15s ease,
+    color 0.15s ease,
+    box-shadow 0.15s ease;
+}
+
+.tool--active {
+  background: var(--accent-soft);
+  color: var(--text);
+  box-shadow: inset 0 0 0 1px var(--accent);
+}
+
+.tool:disabled {
+  cursor: default;
+  opacity: 0.6;
 }
 
 .icon-button {
@@ -143,7 +200,7 @@ body {
   background: var(--surface-hover);
 }
 
-.timer__phases {
+.clock__phases {
   display: flex;
   gap: 4px;
   padding: 3px;
@@ -184,7 +241,7 @@ body {
   opacity: 0.6;
 }
 
-.timer__dial {
+.clock__dial {
   position: relative;
   width: 100%;
   height: 100%;
@@ -235,6 +292,16 @@ body {
   line-height: 1;
   letter-spacing: -0.03em;
   font-variant-numeric: tabular-nums;
+}
+
+.dial__time--stopwatch {
+  font-size: clamp(0.85rem, 17cqmin, 2.55rem);
+}
+
+.dial__hint {
+  color: var(--muted);
+  font-size: clamp(6.5px, 5.5cqmin, 10px);
+  letter-spacing: 0.02em;
 }
 
 .dial__editor {
@@ -332,7 +399,7 @@ body {
   letter-spacing: 0.12em;
 }
 
-.timer__controls {
+.clock__controls {
   display: flex;
   flex-wrap: wrap;
   gap: 6px;
@@ -396,7 +463,7 @@ body {
   color: var(--danger);
 }
 
-.timer__loading {
+.clock__loading {
   margin: auto;
   color: var(--muted);
   font-size: 12px;
@@ -417,16 +484,16 @@ input:focus-visible {
 }
 
 @media (max-height: 420px) {
-  .timer {
+  .clock {
     gap: 6px;
     padding: 9px;
   }
 
-  .timer__subtitle {
+  .clock__subtitle {
     display: none;
   }
 
-  .timer__title {
+  .clock__title {
     font-size: 14px;
   }
 
@@ -439,18 +506,18 @@ input:focus-visible {
     padding: 5px 4px;
   }
 
-  .timer__controls .button {
+  .clock__controls .button {
     padding: 7px 10px;
   }
 }
 
 @media (max-height: 300px) {
-  .timer {
+  .clock {
     gap: 4px;
     padding: 7px;
   }
 
-  .timer__title {
+  .clock__title {
     font-size: 13px;
   }
 
@@ -459,7 +526,7 @@ input:focus-visible {
     height: 26px;
   }
 
-  .timer__phases {
+  .clock__phases {
     padding: 2px;
   }
 
@@ -468,7 +535,7 @@ input:focus-visible {
     font-size: 10.5px;
   }
 
-  .timer__controls .button {
+  .clock__controls .button {
     padding: 6px 8px;
     font-size: 11.5px;
   }
@@ -480,12 +547,12 @@ input:focus-visible {
 }
 
 @media (max-width: 300px) {
-  .timer {
+  .clock {
     gap: 6px;
     padding: 8px;
   }
 
-  .timer__subtitle {
+  .clock__subtitle {
     display: none;
   }
 

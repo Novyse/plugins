@@ -9,7 +9,7 @@ import './style.css';
 // Local development only: `vite` serves the plugin standalone and the fake
 // host answers as the app would. A build drops this branch and the import.
 if (import.meta.env.DEV) {
-  installDevHost({ slug: 'timer', version: '0.1.1' });
+  installDevHost({ slug: 'clock', version: '0.2.0' });
 }
 
 // Default color mode: the palette computed by the host, written to the

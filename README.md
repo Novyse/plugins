@@ -222,7 +222,7 @@ button flips when the room pins the tile, and translates the labels with the
 language of `init().locale`.
 
 Leave it room: keep the heading of the plugin clear of the top-right corner
-(`padding-right: clamp(96px, 34vw, 140px)` on the header is what the timer and
+(`padding-right: clamp(96px, 34vw, 140px)` on the header is what the clock and
 the wheel do), and do not draw those four buttons yourself: a plugin with its
 own close button is a plugin that drifts from the app.
 

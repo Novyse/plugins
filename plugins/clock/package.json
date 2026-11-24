@@ -1,6 +1,6 @@
 {
-  "name": "novyse-plugin-timer",
-  "version": "0.1.3",
+  "name": "novyse-plugin-clock",
+  "version": "0.2.0",
   "private": true,
   "type": "module",
   "scripts": {
