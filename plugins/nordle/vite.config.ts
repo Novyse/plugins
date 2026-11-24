@@ -51,6 +51,7 @@ function manifest(): Plugin {
 }
 
 export default defineConfig({
+  publicDir: false,
   plugins: [tailwindcss(), viteSingleFile(), manifest()],
   esbuild: {
     jsx: 'automatic',

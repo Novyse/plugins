@@ -136,14 +136,14 @@
         "url": "https://github.com/Novyse"
       },
       "description": "Word guessing game",
-      "version": "0.1.0",
-      "tag": "nordle@0.1.0",
+      "version": "0.1.1",
+      "tag": "nordle@0.1.1",
       "icon": "plugins/nordle/store/icon.png",
       "banner": "plugins/nordle/store/banner.png",
       "entry": "plugins/nordle/dist/index.html",
       "bundle": "nordle-bundle.zip",
-      "sha256": "fef6920a5fae5a966569c7d4e3f92ffed29c928dde9e2191ab98c7a6fa1dd6d3",
-      "sizeBytes": 11055379,
+      "sha256": "31ca35e852322314ecc7dbf7dc32550182896c3960ad5dcdb2022d6f26fb6ff0",
+      "sizeBytes": 10204924,
       "capabilities": [
         "fullscreen"
       ],

@@ -170,6 +170,7 @@ export function App() {
       setInit(payload);
       setParticipants(payload.participants);
       setLocale(normalizeLocale(payload.locale));
+      setTimeout(() => window.focus(), 100);
 
       // Replay past state events and aggregate complete history
       const events = payload.state.events;
@@ -444,7 +445,11 @@ export function App() {
   }, [history]);
 
   return (
-    <div className="nordle-app">
+    <div
+      className="nordle-app"
+      tabIndex={0}
+      onClick={() => window.focus()}
+    >
       <header className="header">
         <div className="header-group">
           <button
