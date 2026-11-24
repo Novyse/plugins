@@ -150,6 +150,7 @@ vite.config.ts.timestamp-*
 
 # Plugin build artifacts
 plugins/*/dist/
+_site/
 
 # Release assets: uploaded to GitHub Releases, never committed
 *.zip
