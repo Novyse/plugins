@@ -29,6 +29,12 @@ export function getLanguageMeta(code: string): LanguageMeta {
   );
 }
 
+// Statically import all JSON word lists from the data folder at build time
+const wordFiles = import.meta.glob<string[]>('../public/data/*/*.json', {
+  eager: true,
+  import: 'default',
+});
+
 const wordsCache = new Map<string, string[]>();
 const setsCache = new Map<string, Set<string>>();
 
@@ -44,19 +50,14 @@ export async function loadWordList(
     };
   }
 
-  try {
-    const url = new URL(`data/${lang}/${length}.json`, window.location.href).href;
-    const res = await fetch(url);
-    if (!res.ok) throw new Error(`HTTP ${res.status}`);
-    const words: string[] = await res.json();
-    wordsCache.set(key, words);
-    const set = new Set(words);
-    setsCache.set(key, set);
-    return { words, set };
-  } catch (err) {
-    console.error(`Failed to load word list for ${lang}:${length}:`, err);
-    return { words: [], set: new Set() };
-  }
+  const path = `../public/data/${lang}/${length}.json`;
+  const fallbackPath = `../public/data/it/${length}.json`;
+  const words: string[] = wordFiles[path] ?? wordFiles[fallbackPath] ?? [];
+
+  const set = new Set(words);
+  wordsCache.set(key, words);
+  setsCache.set(key, set);
+  return { words, set };
 }
 
 export function getTodayIdx(): number {
